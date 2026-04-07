@@ -142,12 +142,50 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     emit(state.copyWith(isLoading: true));
 
     try {
-      final status = await Permission.location.request();
-      if (!status.isGranted) throw Exception("Izin lokasi ditolak");
+      bool serviceEnabled;
+      LocationPermission permission;
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        // Location services are not enabled don't continue
+        // accessing the position and request users of the
+        // App to enable the location services.
+        Fluttertoast.showToast(
+          msg: "Location services are disabled",
+          timeInSecForIosWeb: 2,
+        );
+        return Future.error('Location services are disabled.');
+      }
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          // Permissions are denied, next time you could try
+          // requesting permissions again (this is also where
+          // Android's shouldShowRequestPermissionRationale
+          // returned true. According to Android guidelines
+          // your App should show an explanatory UI now.
+          Fluttertoast.showToast(
+            msg: "Location permissions are denied",
+            timeInSecForIosWeb: 2,
+          );
+          return Future.error('Location permissions are denied');
+        }
+      }
 
+      if (permission == LocationPermission.deniedForever) {
+        // Permissions are denied forever, handle appropriately.
+        Fluttertoast.showToast(
+          msg: "Location permissions are permanently denied",
+          timeInSecForIosWeb: 2,
+        );
+        return Future.error(
+          'Location permissions are permanently denied, we cannot request permissions.',
+        );
+      }
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
+        locationSettings: WebSettings(
+          accuracy: LocationAccuracy.high,
+          maximumAge: Duration(minutes: 5),
         ),
       );
       final isMock = await TrustLocation.isMockLocation;
