@@ -1,0 +1,332 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:trust_location/trust_location.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
+import 'package:fluttertoast/fluttertoast.dart';
+import 'attendance_event.dart';
+import 'attendance_state.dart';
+
+class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
+  Timer? _clockTimer;
+  Timer? _locationTimer;
+  final supabase = Supabase.instance.client;
+  final double officeLat = -8.641514;
+  final double officeLng = 115.209754;
+  final double radiusMeters = 100.0;
+
+  AttendanceBloc() : super(AttendanceState(currentTime: DateTime.now())) {
+    on<LoadAttendance>(_onLoadAttendance);
+    on<UpdateLocation>(_onUpdateLocation);
+    on<StartLocationUpdates>(_onStartLocationUpdates);
+    on<StopLocationUpdates>(_onStopLocationUpdates);
+    on<ChangeView>(_onChangeView);
+    on<ClockIn>(_onClockIn);
+    on<ClockOut>(_onClockOut);
+    on<PickSickFile>(_onPickSickFile);
+    on<ClearSickFile>(_onClearSickFile);
+    on<SubmitIjin>(_onSubmitIjin);
+    on<SubmitBIB>(_onSubmitBIB);
+    on<UploadSickNote>(_onUploadSickNote);
+    on<UpdateTime>(_onUpdateTime);
+    _startClock();
+    add(LoadAttendance());
+  }
+
+  void _startClock() {
+    DateTime lastEmittedTime = state.currentTime;
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final now = DateTime.now();
+      // Only emit if the minute has changed (to avoid unnecessary rebuilds)
+      if (now.minute != lastEmittedTime.minute) {
+        lastEmittedTime = now;
+        add(UpdateTime(now)); // Dispatch event instead of emitting directly
+      }
+    });
+  }
+
+  // Add this new event handler
+  void _onUpdateTime(UpdateTime event, Emitter<AttendanceState> emit) {
+    emit(state.copyWith(currentTime: event.time));
+  }
+
+  Future<void> _onLoadAttendance(
+    LoadAttendance event,
+    Emitter<AttendanceState> emit,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final clockIn = prefs.getString('clockIn_$today');
+    final clockOut = prefs.getString('clockOut_$today');
+
+    emit(state.copyWith(clockInTime: clockIn, clockOutTime: clockOut));
+  }
+
+  Future<void> _saveAttendance() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (state.clockInTime != null) {
+      await prefs.setString('clockIn_$today', state.clockInTime!);
+    }
+    if (state.clockOutTime != null) {
+      await prefs.setString('clockOut_$today', state.clockOutTime!);
+    }
+  }
+
+  Future<void> _insertAttendanceToSupabase({
+    required String status,
+    String? note,
+    double? lat,
+    double? lng,
+    double? distance,
+  }) async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception("User belum login");
+
+      final now = DateTime.now();
+
+      await supabase.from('attendance').insert({
+        'user_id': user.id,
+        'date': DateFormat('yyyy-MM-dd').format(now),
+        'clock_in': status == 'clock-in' ? now.toIso8601String() : null,
+        'clock_out': status == 'clock-out' ? now.toIso8601String() : null,
+        'status': status == 'clock-in' || status == 'clock-out'
+            ? 'hadir'
+            : status,
+        'latitude': lat,
+        'longitude': lng,
+        'distance_meters': distance,
+        'note': note,
+      });
+
+      Fluttertoast.showToast(msg: "Data berhasil disimpan ke Supabase");
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Gagal menyimpan ke server: $e");
+    }
+  }
+
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const R = 6371e3;
+    final phi1 = lat1 * math.pi / 180;
+    final phi2 = lat2 * math.pi / 180;
+    final deltaPhi = (lat2 - lat1) * math.pi / 180;
+    final deltaLambda = (lon2 - lon1) * math.pi / 180;
+
+    final a =
+        math.sin(deltaPhi / 2) * math.sin(deltaPhi / 2) +
+        math.cos(phi1) *
+            math.cos(phi2) *
+            math.sin(deltaLambda / 2) *
+            math.sin(deltaLambda / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return R * c;
+  }
+
+  Future<void> _onUpdateLocation(
+    UpdateLocation event,
+    Emitter<AttendanceState> emit,
+  ) async {
+    emit(state.copyWith(isLoading: true));
+
+    try {
+      final status = await Permission.location.request();
+      if (!status.isGranted) throw Exception("Izin lokasi ditolak");
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+        ),
+      );
+      final isMock = await TrustLocation.isMockLocation;
+      final dist = _calculateDistance(
+        pos.latitude,
+        pos.longitude,
+        officeLat,
+        officeLng,
+      );
+      final withinRadius = dist <= radiusMeters && !isMock;
+
+      emit(
+        state.copyWith(
+          position: pos,
+          distance: dist,
+          isMockDetected: isMock,
+          isWithinRadius: withinRadius,
+          isLoading: false,
+        ),
+      );
+    } catch (e) {
+      emit(state.copyWith(isLoading: false));
+      Fluttertoast.showToast(msg: "Gagal mendapatkan lokasi");
+    }
+  }
+
+  void _onStartLocationUpdates(
+    StartLocationUpdates event,
+    Emitter<AttendanceState> emit,
+  ) {
+    _locationTimer?.cancel();
+    add(UpdateLocation());
+    _locationTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => add(UpdateLocation()),
+    );
+  }
+
+  void _onStopLocationUpdates(
+    StopLocationUpdates event,
+    Emitter<AttendanceState> emit,
+  ) {
+    _locationTimer?.cancel();
+  }
+
+  void _onChangeView(ChangeView event, Emitter<AttendanceState> emit) {
+    emit(state.copyWith(currentView: event.view));
+  }
+
+  Future<void> _onClockIn(ClockIn event, Emitter<AttendanceState> emit) async {
+    if (state.isMockDetected || !state.isWithinRadius) return;
+
+    final timeStr = DateFormat('HH:mm').format(state.currentTime);
+    emit(state.copyWith(clockInTime: timeStr));
+    await _saveAttendance();
+    await _insertAttendanceToSupabase(
+      status: 'clock-in',
+      lat: state.position?.latitude,
+      lng: state.position?.longitude,
+      distance: state.distance,
+    );
+    Fluttertoast.showToast(msg: "Clock In berhasil!");
+    add(ChangeView('dashboard'));
+  }
+
+  Future<void> _onClockOut(
+    ClockOut event,
+    Emitter<AttendanceState> emit,
+  ) async {
+    if (state.isMockDetected || !state.isWithinRadius) return;
+
+    final timeStr = DateFormat('HH:mm').format(state.currentTime);
+    emit(state.copyWith(clockOutTime: timeStr));
+    await _saveAttendance();
+    await _insertAttendanceToSupabase(
+      status: 'clock-out',
+      lat: state.position?.latitude,
+      lng: state.position?.longitude,
+      distance: state.distance,
+    );
+    Fluttertoast.showToast(msg: "Clock Out berhasil!");
+    add(ChangeView('dashboard'));
+  }
+
+  void _onPickSickFile(PickSickFile event, Emitter<AttendanceState> emit) {
+    emit(state.copyWith(sickFile: event.file));
+  }
+
+  void _onClearSickFile(ClearSickFile event, Emitter<AttendanceState> emit) {
+    emit(state.copyWith(sickFile: null));
+  }
+
+  Future<void> _onSubmitIjin(
+    SubmitIjin event,
+    Emitter<AttendanceState> emit,
+  ) async {
+    emit(state.copyWith(isLoading: true));
+    final success = await _uploadToServer("ijin", reason: event.reason);
+    await _insertAttendanceToSupabase(status: 'ijin', note: event.reason);
+    emit(state.copyWith(isLoading: false));
+
+    if (success) {
+      Fluttertoast.showToast(msg: "Permohonan ijin berhasil dikirim!");
+      emit(state.copyWith(ijinReason: '', currentView: 'dashboard'));
+    }
+  }
+
+  Future<void> _onSubmitBIB(
+    SubmitBIB event,
+    Emitter<AttendanceState> emit,
+  ) async {
+    Fluttertoast.showToast(msg: "Absensi BIB berhasil!");
+    add(ChangeView('dashboard'));
+  }
+
+  Future<void> _onUploadSickNote(
+    UploadSickNote event,
+    Emitter<AttendanceState> emit,
+  ) async {
+    if (state.sickFile == null) return;
+    emit(state.copyWith(isLoading: true));
+
+    final success = await _uploadToServer("sakit", file: state.sickFile);
+    await _insertAttendanceToSupabase(
+      status: 'sakit',
+      note: "Surat sakit diupload",
+    );
+    emit(state.copyWith(isLoading: false));
+
+    if (success) {
+      Fluttertoast.showToast(msg: "Surat sakit berhasil dikirim ke server!");
+      add(ClearSickFile());
+      add(ChangeView('dashboard'));
+    }
+  }
+
+  // Future<void> _signIn(
+  //   SignInWithEmail event,
+  //   Emitter<AttendanceState> emit,
+  // ) async {
+  //   try {
+  //     await supabase.auth.signInWithPassword(
+  //       email: event.email,
+  //       password: event.password,
+  //     );
+  //     // Setelah login berhasil, load attendance hari ini
+  //     add(LoadAttendance());
+  //   } catch (e) {
+  //     Fluttertoast.showToast(msg: "Login gagal: $e");
+  //   }
+  // }
+
+  Future<bool> _uploadToServer(
+    String type, {
+    XFile? file,
+    String? reason,
+  }) async {
+    try {
+      final url = Uri.parse("https://jsonplaceholder.typicode.com/posts");
+      final request = http.MultipartRequest('POST', url);
+
+      request.fields['type'] = type;
+      request.fields['date'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      if (reason != null) request.fields['reason'] = reason;
+      if (file != null) {
+        request.files.add(await http.MultipartFile.fromPath('file', file.path));
+      }
+
+      final response = await request.send();
+      return response.statusCode < 300;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  @override
+  Future<void> close() {
+    _clockTimer?.cancel();
+    _locationTimer?.cancel();
+    return super.close();
+  }
+}
