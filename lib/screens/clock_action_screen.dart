@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../bloc/attendance/attendance_bloc.dart';
 import '../bloc/attendance/attendance_event.dart';
+import 'out_of_radius_screen.dart';
 
 class ClockActionScreen extends StatefulWidget {
   const ClockActionScreen({super.key});
@@ -41,6 +42,9 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
   Widget build(BuildContext context) {
     return BlocBuilder<AttendanceBloc, AttendanceState>(
       builder: (context, state) {
+        if (!state.isWithinRadius) {
+          return const OutOfRadiusScreen();
+        }
         final bloc = context.read<AttendanceBloc>();
         final isClockIn = state.currentView == 'clock-in';
         print(state.toString());
@@ -70,14 +74,14 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                   ),
                   MarkerLayer(
                     markers: [
-                      Marker(
-                        point: const LatLng(-8.641514, 115.209754),
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                          size: 40,
-                        ),
-                      ),
+                      //Marker(
+                     // pointt: const LatLng(-8.641514, 115.209754),
+                       // child: const Icon(
+                       //   Icons.location_on,
+                      //    color: Colors.red,
+                    //      size: 40,
+                    //    ),
+                  //    ),
                       if (state.position != null)
                         Marker(
                           point: LatLng(
@@ -85,8 +89,8 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                             state.position!.longitude,
                           ),
                           child: const Icon(
-                            Icons.my_location,
-                            color: Colors.blue,
+                            Icons.location_on,
+                            color: Colors.red,
                             size: 40,
                           ),
                         ),
