@@ -33,6 +33,7 @@ class IjinScreen extends StatelessWidget {
                     hintText: "Tuliskan alasan ijin Anda...",
                   ),
                   onChanged: (value) {
+                    bloc.add(SubmitIjin(value));
                     // Untuk simplicity, kita simpan di state
                     // Bisa di-improve dengan TextEditingController
                   },
