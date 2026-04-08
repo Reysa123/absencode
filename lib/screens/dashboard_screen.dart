@@ -1,9 +1,11 @@
 import 'package:absen/bloc/attendance/attendance_bloc.dart';
 import 'package:absen/bloc/attendance/attendance_state.dart';
+import 'package:absen/main.dart';
 import 'package:absen/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../bloc/attendance/attendance_event.dart';
 
@@ -19,11 +21,13 @@ class DashboardScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              //await Supabase.instance.client.auth.signOut();
 
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                MaterialPageRoute(builder: (_) => const AuthWrapper()),
               );
             },
           ),

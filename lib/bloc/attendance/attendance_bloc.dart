@@ -5,10 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:trust_location/trust_location.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'attendance_event.dart';
@@ -94,22 +92,24 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       final now = DateTime.now();
 
       await supabase.from('attendance').insert({
-        'user_id': user.id,
+        'user_id': user.id.toString(),
         'date': DateFormat('yyyy-MM-dd').format(now),
         'clock_in': status == 'clock-in' ? now.toIso8601String() : null,
         'clock_out': status == 'clock-out' ? now.toIso8601String() : null,
         'status': status == 'clock-in' || status == 'clock-out'
             ? 'hadir'
             : status,
-        'latitude': lat,
-        'longitude': lng,
-        'distance_meters': distance,
+
+        'latitude': lat.toString(),
+        'longitude': lng.toString(),
+        'distance_meters': distance.toString(),
         'note': note,
       });
 
       Fluttertoast.showToast(msg: "Data berhasil disimpan ke Supabase");
     } catch (e) {
       Fluttertoast.showToast(msg: "Gagal menyimpan ke server: $e");
+      print(e.toString());
     }
   }
 
@@ -142,9 +142,11 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     emit(state.copyWith(isLoading: true));
 
     try {
+      print('awal');
       bool serviceEnabled;
       LocationPermission permission;
       serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      print('serviceEnabled: $serviceEnabled');
       if (!serviceEnabled) {
         // Location services are not enabled don't continue
         // accessing the position and request users of the
@@ -156,6 +158,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         return Future.error('Location services are disabled.');
       }
       permission = await Geolocator.checkPermission();
+      print('permission: $permission');
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
@@ -169,6 +172,14 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
             timeInSecForIosWeb: 2,
           );
           return Future.error('Location permissions are denied');
+        }
+        if (permission == LocationPermission.always ||
+            permission == LocationPermission.whileInUse) {
+          // Permission granted, continue with location updates
+          Fluttertoast.showToast(
+            msg: "Location permissions are successfully granted",
+            timeInSecForIosWeb: 2,
+          );
         }
       }
 
@@ -188,20 +199,24 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
           maximumAge: Duration(minutes: 5),
         ),
       );
-      final isMock = await TrustLocation.isMockLocation;
+      print(pos.isMocked);
+      print(pos.longitude);
+      //final isMock = await TrustLocation.isMockLocation;
       final dist = _calculateDistance(
         pos.latitude,
         pos.longitude,
         officeLat,
         officeLng,
       );
-      final withinRadius = dist <= radiusMeters && !isMock;
+      // print('Distance to office: $dist meters');
+      // print('isMock: $isMock');
+      final withinRadius = dist <= radiusMeters;
 
       emit(
         state.copyWith(
           position: pos,
           distance: dist,
-          isMockDetected: isMock,
+          isMockDetected: false,
           isWithinRadius: withinRadius,
           isLoading: false,
         ),
@@ -241,6 +256,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     final timeStr = DateFormat('HH:mm').format(state.currentTime);
     emit(state.copyWith(clockInTime: timeStr));
     await _saveAttendance();
+    print(state.position?.latitude);
     await _insertAttendanceToSupabase(
       status: 'clock-in',
       lat: state.position?.latitude,

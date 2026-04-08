@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:absen/main.dart';
+import 'package:absen/screens/user_data_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:fluttertoast/fluttertoast.dart'; //
+import 'package:fluttertoast/fluttertoast.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,6 +19,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _isLogin = true;
@@ -36,14 +42,16 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text.trim(),
         );
 
-        if (response.user != null) {
-          Fluttertoast.showToast(msg: "Login berhasil!");
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const AuthWrapper()),
-            );
-          }
+        final user = response.user;
+        if (user != null) {
+          final pref = await SharedPreferences.getInstance();
+          await pref.setString('user', _emailController.text.trim());
+          await pref.setString('pass', _passwordController.text.trim());
+          Fluttertoast.showToast(
+            msg: "Login berhasil!",
+            toastLength: Toast.LENGTH_LONG,
+          );
+          if (mounted) _navigateToUserData(user.id);
         }
       } else {
         final response = await supabase.auth.signUp(
@@ -51,51 +59,115 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text.trim(),
         );
 
-        if (response.user != null) {
+        final user = response.user;
+        if (user != null) {
+          final pref = await SharedPreferences.getInstance();
+          await pref.setString('user', _emailController.text.trim());
+          await pref.setString('pass', _passwordController.text.trim());
           Fluttertoast.showToast(
-            msg: "Registrasi berhasil! Silakan cek email untuk verifikasi.",
+            msg: "Registrasi berhasil! Silakan lengkapi data.",
+            toastLength: Toast.LENGTH_LONG,
           );
-          setState(() => _isLogin = true);
+          if (mounted) _navigateToUserData(user.id);
         }
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: "Error: ${e.toString()}");
+      Fluttertoast.showToast(
+        msg: "Error: ${e.toString()}",
+        toastLength: Toast.LENGTH_LONG,
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _signInWithGoogle() async {
+  void _navigateToUserData(String userId) async {
+    final userid = await SharedPreferences.getInstance().then(
+      (prefs) => prefs.getString('userid'),
+    );
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            userid != null ? AuthWrapper() : UserDataScreen(userId: userId),
+      ),
+    );
+  }
+
+  Future<void> _signInWithGoogles() async {
     setState(() => _isLoading = true);
 
+    late final StreamSubscription authSub;
+    authSub = supabase.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      final user = data.session?.user;
+      print("Auth event: $event, user: ${user?.email}");
+      if (event == AuthChangeEvent.signedIn && user != null) {
+        authSub.cancel();
+        if (mounted) _navigateToUserData(user.id);
+      }
+    });
+
     try {
-      final response = await supabase.auth.signInWithOAuth(
+      final a = await supabase.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: kIsWeb
             ? null
-            : 'https://yqyjnwclewpmlpvmjnzq.supabase.co/auth/v1/callback', // Replace with your deep link URL
+            : 'https://yqyjnwclewpmlpvmjnzq.supabase.co/auth/v1/callback',
       );
-
-      if (response) {
-        // OAuth initiated successfully; handle redirect in deep link listener
-        Fluttertoast.showToast(msg: "Redirecting to Google...");
-      }
+      print(a.toString());
+      Fluttertoast.showToast(msg: "Redirecting to Google...");
     } catch (e) {
       Fluttertoast.showToast(msg: "Google sign-in failed: $e");
+      authSub.cancel();
     } finally {
       if (mounted) setState(() => _isLoading = false);
-      supabase.auth.onAuthStateChange.listen((data) {
-        final AuthChangeEvent event = data.event;
-        if (event == AuthChangeEvent.signedIn) {
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const AuthWrapper()),
-            );
-          }
-          // Do something when user sign in
-        }
-      });
+    }
+  }
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+
+  Future<void> _signInWithGoogle() async {
+    try {
+      // 1. Initialize (required in v7+)
+      await _googleSignIn.initialize(
+        clientId:
+            '1046592736218-0eu1lc2fgotr7bjvng5iiofqgdkcaht2.apps.googleusercontent.com', // for iOS
+        serverClientId:
+            '1046592736218-k2gvdp9mdu3erv95ouhm3r3ctovsq95t.apps.googleusercontent.com', // Important for getting idToken
+        //scopes: ['email', 'profile', 'openid'],
+      );
+
+      // 2. Authenticate (replaces the old .signIn())
+      final GoogleSignInAccount? googleUser = await _googleSignIn
+          .authenticate();
+
+      if (googleUser == null) {
+        print('User canceled Google Sign-In');
+        return;
+      }
+
+      // 3. Get authentication tokens
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+
+      final String? idToken = googleAuth.idToken;
+      //final String? accessToken = googleAuth.accessToken;
+
+      if (idToken == null) {
+        throw Exception('No ID Token received from Google.');
+      }
+
+      // 4. Sign in to Supabase
+      final response = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        // accessToken: accessToken,
+      );
+
+      print('Successfully signed in with Supabase: ${response.user?.email}');
+    } catch (e) {
+      print('Google Sign-In Error: $e');
+      // You can show a user-friendly message here
     }
   }
 
@@ -136,14 +208,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 25),
-
-                // Google Sign-In Button
                 ElevatedButton.icon(
                   onPressed: _isLoading ? null : _signInWithGoogle,
-                  icon: Image.asset(
-                    'assets/google.jpg',
-                    height: 24,
-                  ), // Add Google logo asset
+                  icon: Image.asset('assets/google.jpg', height: 24),
                   label: const Text("Sign in with Google"),
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 56),
@@ -159,7 +226,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -179,7 +245,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 12),
-
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
@@ -199,7 +264,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-
                 ElevatedButton(
                   onPressed: _isLoading ? null : _authenticate,
                   style: ElevatedButton.styleFrom(
@@ -213,9 +277,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: const TextStyle(fontSize: 18),
                         ),
                 ),
-
                 const SizedBox(height: 12),
-
                 TextButton(
                   onPressed: () => setState(() => _isLogin = !_isLogin),
                   child: Text(
@@ -224,7 +286,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         : "Sudah punya akun? Login",
                   ),
                 ),
-
                 if (_isLogin)
                   TextButton(
                     onPressed: _resetPassword,

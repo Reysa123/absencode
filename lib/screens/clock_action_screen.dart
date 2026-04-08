@@ -15,17 +15,24 @@ class ClockActionScreen extends StatefulWidget {
 
 class _ClockActionScreenState extends State<ClockActionScreen> {
   MapController? mapController;
-
+  late AttendanceBloc attendanceBloc;
   @override
   void initState() {
     super.initState();
     mapController = MapController();
-    context.read<AttendanceBloc>().add(StartLocationUpdates());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    attendanceBloc = context.read<AttendanceBloc>();
+    attendanceBloc.add(StartLocationUpdates());
   }
 
   @override
   void dispose() {
-    context.read<AttendanceBloc>().add(StopLocationUpdates());
+    attendanceBloc.add(StopLocationUpdates());
+    //context.read<AttendanceBloc>().add(StopLocationUpdates());
     mapController?.dispose();
     super.dispose();
   }
@@ -36,7 +43,7 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
       builder: (context, state) {
         final bloc = context.read<AttendanceBloc>();
         final isClockIn = state.currentView == 'clock-in';
-
+        print(state.toString());
         return Scaffold(
           appBar: AppBar(
             title: Text(isClockIn ? 'Clock In' : 'Clock Out'),
@@ -56,8 +63,10 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                 ),
                 children: [
                   TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.app', // Replace with your app's package name
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName:
+                        'com.example.absen', // Replace with your app's package name
                   ),
                   MarkerLayer(
                     markers: [
@@ -71,7 +80,10 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                       ),
                       if (state.position != null)
                         Marker(
-                          point: LatLng(state.position!.latitude, state.position!.longitude),
+                          point: LatLng(
+                            state.position!.latitude,
+                            state.position!.longitude,
+                          ),
                           child: const Icon(
                             Icons.my_location,
                             color: Colors.blue,
@@ -103,8 +115,12 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                   padding: const EdgeInsets.all(20),
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 12)],
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black26, blurRadius: 12),
+                    ],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -115,7 +131,9 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: state.isWithinRadius ? Colors.green : Colors.red,
+                            color: state.isWithinRadius
+                                ? Colors.green
+                                : Colors.red,
                           ),
                         ),
                       if (state.isMockDetected)
@@ -124,19 +142,33 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                           child: Text(
                             "⚠️ Mock Location Terdeteksi!\nAbsensi dinonaktifkan.",
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: (state.isWithinRadius && !state.isMockDetected)
-                            ? () => bloc.add(state.currentView == 'clock-in' ? ClockIn() : ClockOut())
+                        onPressed:
+                            (state.isWithinRadius && !state.isMockDetected)
+                            ? () => bloc.add(
+                                state.currentView == 'clock-in'
+                                    ? ClockIn()
+                                    : ClockOut(),
+                              )
                             : null,
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 60),
                           backgroundColor: Colors.blue[700],
                         ),
-                        child: const Text("SUBMIT ABSENSI", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          "SUBMIT ABSENSI",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
