@@ -6,13 +6,15 @@ import 'package:absen/screens/login_screen.dart';
 import 'package:absen/screens/sakit_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'bloc/attendance/attendance_bloc.dart';
 import 'screens/dashboard_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+late SharedPreferences pref;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  pref = await SharedPreferences.getInstance();
   await Supabase.initialize(
     url: 'https://yqyjnwclewpmlpvmjnzq.supabase.co', // Ganti dengan URL Anda
     anonKey:
@@ -40,12 +42,35 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = Supabase.instance.client.auth.currentSession;
-
-    return BlocProvider(
-      create: (_) => AttendanceBloc(),
-      child: session != null ? const AttendanceHome() : const LoginScreen(),
-    );
+    final user = pref.getString('user') ?? '';
+    final pass = pref.getString('pass') ?? "";
+    if (user.isNotEmpty && pass.isNotEmpty) {
+      return FutureBuilder(
+        future: Supabase.instance.client.auth.signInWithPassword(
+          email: user,
+          password: pass,
+        ),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          } else if (snapshot.hasError || snapshot.data?.user == null) {
+            return BlocProvider(
+              create: (_) => AttendanceBloc(),
+              child: const LoginScreen(),
+            );
+          } else {
+            return BlocProvider(
+              create: (_) => AttendanceBloc(),
+              child: AttendanceHome(),
+            );
+          }
+        },
+      );
+    } else {
+      return const LoginScreen();
+    }
   }
 }
 
