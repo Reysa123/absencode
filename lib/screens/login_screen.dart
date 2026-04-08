@@ -4,7 +4,6 @@ import 'package:absen/main.dart';
 import 'package:absen/screens/user_data_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -94,8 +93,8 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _signInWithGoogles() async {
-    setState(() => _isLoading = true);
+  Future<void> _signInWithGoogle() async {
+    // setState(() => _isLoading = true);
 
     late final StreamSubscription authSub;
     authSub = supabase.auth.onAuthStateChange.listen((data) {
@@ -109,65 +108,22 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final a = await supabase.auth.signInWithOAuth(
+      await supabase.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: kIsWeb
             ? null
             : 'https://yqyjnwclewpmlpvmjnzq.supabase.co/auth/v1/callback',
+
+        authScreenLaunchMode: kIsWeb
+            ? LaunchMode.platformDefault
+            : LaunchMode.externalApplication,
       );
-      print(a.toString());
       Fluttertoast.showToast(msg: "Redirecting to Google...");
     } catch (e) {
       Fluttertoast.showToast(msg: "Google sign-in failed: $e");
       authSub.cancel();
     } finally {
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
-
-  Future<void> _signInWithGoogle() async {
-    try {
-      // 1. Initialize (required in v7+)
-      await _googleSignIn.initialize(
-        clientId:
-            '1046592736218-0eu1lc2fgotr7bjvng5iiofqgdkcaht2.apps.googleusercontent.com', // for iOS
-        serverClientId:
-            '1046592736218-k2gvdp9mdu3erv95ouhm3r3ctovsq95t.apps.googleusercontent.com', // Important for getting idToken
-        //scopes: ['email', 'profile', 'openid'],
-      );
-
-      // 2. Authenticate (replaces the old .signIn())
-      final GoogleSignInAccount? googleUser = await _googleSignIn
-          .authenticate();
-
-      if (googleUser == null) {
-        print('User canceled Google Sign-In');
-        return;
-      }
-
-      // 3. Get authentication tokens
-      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-
-      final String? idToken = googleAuth.idToken;
-      //final String? accessToken = googleAuth.accessToken;
-
-      if (idToken == null) {
-        throw Exception('No ID Token received from Google.');
-      }
-
-      // 4. Sign in to Supabase
-      final response = await Supabase.instance.client.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        // accessToken: accessToken,
-      );
-
-      print('Successfully signed in with Supabase: ${response.user?.email}');
-    } catch (e) {
-      print('Google Sign-In Error: $e');
-      // You can show a user-friendly message here
     }
   }
 
@@ -209,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 25),
                 ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _signInWithGoogle,
+                  onPressed: _isLoading ? null : null,
                   icon: Image.asset('assets/google.jpg', height: 24),
                   label: const Text("Sign in with Google"),
                   style: ElevatedButton.styleFrom(
