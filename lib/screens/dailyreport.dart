@@ -125,12 +125,25 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
               pw.Text(
                 'Laporan Absensi Bulan $selectedMonth',
                 style: pw.TextStyle(
-                  fontSize: 20,
+                  fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
+              pw.Text(
+                selectedName != null ? 'Nama    : $selectedName' : 'Semua Nama',
+                style: pw.TextStyle(fontSize: 12),
+              ),
+              pw.Text(
+                'Sekolah :${filteredReports.isNotEmpty ? filteredReports[0]['user']['alamatsekolah'] : '-'}',
+                style: pw.TextStyle(fontSize: 12),
+              ),
               pw.SizedBox(height: 20),
               pw.TableHelper.fromTextArray(
+                cellStyle: pw.TextStyle(fontSize: 12),
+                headerStyle: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                ),
                 headers: ['Tanggal', 'Clock In', 'Clock Out', 'Note'],
                 data: filteredReports
                     .map(
@@ -177,146 +190,168 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButton<String>(
-                          value: selectedMonth,
-                          hint: const Text('Pilih Bulan'),
-                          items: availableMonths.map((month) {
-                            return DropdownMenuItem<String>(
-                              value: month,
-                              child: Text(month),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              selectedMonth = value;
-                              selectedName = null;
-                              selectedDay = null;
-                            });
-                            _fetchReports();
-                          },
-                        ),
+                  child: Card(
+                    color: Colors.lightGreen.shade100,
+                    elevation: 5,
+                    shadowColor: Colors.blueAccent,
+                    child: Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButton<String>(
+                              value: selectedMonth,
+                              hint: const Text('Pilih Bulan'),
+                              items: availableMonths.map((month) {
+                                return DropdownMenuItem<String>(
+                                  value: month,
+                                  child: Text(month),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedMonth = value;
+                                  selectedName = null;
+                                  selectedDay = null;
+                                });
+                                _fetchReports();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: DropdownButton<String>(
+                              value: selectedName,
+                              hint: const Text('Pilih Nama'),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('Semua'),
+                                ),
+                                ...availableNames.map((name) {
+                                  return DropdownMenuItem<String>(
+                                    value: name,
+                                    child: Text(name),
+                                  );
+                                }),
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedName = value;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              foregroundColor: Colors.white,
+                              elevation: 5,
+                              shadowColor: Colors.redAccent,
+                            ),
+                            onPressed: _generatePDF,
+                            child: const Text('Generate PDF'),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: DropdownButton<String>(
-                          value: selectedName,
-                          hint: const Text('Pilih Nama'),
+                    ),
+                  ),
+                ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      spacing: 16,
+                      children: [
+                        Text('Filter berdasarkan tanggal : '),
+                        DropdownButton<String>(
+                          value: selectedDay,
+                          hint: const Text('Pilih Tanggal'),
+                          borderRadius: BorderRadius.circular(8),
+                          dropdownColor: Colors.white,
                           items: [
                             const DropdownMenuItem<String>(
                               value: null,
                               child: Text('Semua'),
                             ),
-                            ...availableNames.map((name) {
+                            ...availableDays.map((day) {
                               return DropdownMenuItem<String>(
-                                value: name,
-                                child: Text(name),
+                                value: day,
+                                child: Text(day),
                               );
                             }),
                           ],
                           onChanged: (value) {
                             setState(() {
-                              selectedName = value;
+                              selectedDay = value;
                             });
                           },
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: _generatePDF,
-                        child: const Text('Generate PDF'),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    spacing: 16,
-                    children: [
-                      Text('Filter berdasarkan tanggal : '),
-                      DropdownButton<String>(
-                        value: selectedDay,
-                        hint: const Text('Pilih Tanggal'),
-                        borderRadius: BorderRadius.circular(8),
-                        dropdownColor: Colors.white,
-                        items: [
-                          const DropdownMenuItem<String>(
-                            value: null,
-                            child: Text('Semua'),
-                          ),
-                          ...availableDays.map((day) {
-                            return DropdownMenuItem<String>(
-                              value: day,
-                              child: Text(day),
-                            );
-                          }),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            selectedDay = value;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
+
                 Expanded(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('Absen')),
-                        DataColumn(label: Text('Nama')),
-                        DataColumn(label: Text('Sekolah')),
-                        DataColumn(label: Text('Tanggal')),
-                        DataColumn(label: Text('Clock In')),
-                        DataColumn(label: Text('Clock Out')),
-                        DataColumn(label: Text('Note')),
-                      ],
-                      rows: filteredReports.map((report) {
-                        final profile = report['user'] as Map<String, dynamic>?;
-                        return DataRow(
-                          color: WidgetStatePropertyAll(
-                            _getRowColor(report['status'], report['date']),
-                          ),
-                          cells: [
-                            DataCell(Text(report['status'] ?? '-')),
-                            DataCell(Text(profile?['nama'] ?? '-')),
-                            DataCell(Text(profile?['alamatsekolah'] ?? '-')),
-                            DataCell(Text(report['date'] ?? '-')),
-                            DataCell(
-                              Text(
-                                report['clock_in'] != null
-                                    ? DateFormat('HH:mm').format(
-                                        DateTime.parse(report['clock_in']),
-                                      )
-                                    : '-',
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: DataTable(
+                        columns: const [
+                          DataColumn(label: Text('Absen')),
+                          DataColumn(label: Text('Nama')),
+                          DataColumn(label: Text('Sekolah')),
+                          DataColumn(label: Text('Tanggal')),
+                          DataColumn(label: Text('Clock In')),
+                          DataColumn(label: Text('Clock Out')),
+                          DataColumn(label: Text('Note')),
+                        ],
+                        rows: filteredReports.map((report) {
+                          final profile =
+                              report['user'] as Map<String, dynamic>?;
+                          return DataRow(
+                            color: WidgetStatePropertyAll(
+                              _getRowColor(report['status'], report['date']),
+                            ),
+                            cells: [
+                              DataCell(Text(report['status'] ?? '-')),
+                              DataCell(Text(profile?['nama'] ?? '-')),
+                              DataCell(Text(profile?['alamatsekolah'] ?? '-')),
+                              DataCell(Text(report['date'] ?? '-')),
+                              DataCell(
+                                Text(
+                                  report['clock_in'] != null
+                                      ? DateFormat('HH:mm').format(
+                                          DateTime.parse(report['clock_in']),
+                                        )
+                                      : '-',
+                                ),
                               ),
-                            ),
-                            DataCell(
-                              Text(
-                                report['clock_out'] != null
-                                    ? DateFormat('HH:mm').format(
-                                        DateTime.parse(report['clock_out']),
-                                      )
-                                    : '-',
+                              DataCell(
+                                Text(
+                                  report['clock_out'] != null
+                                      ? DateFormat('HH:mm').format(
+                                          DateTime.parse(report['clock_out']),
+                                        )
+                                      : '-',
+                                ),
                               ),
-                            ),
-                            DataCell(
-                              (fileExists[report['note']] ?? false)
-                                  ? IconButton(
-                                      icon: const Icon(Icons.download),
-                                      onPressed: () =>
-                                          _downloadFile(report['note']),
-                                    )
-                                  : const Text('-'),
-                            ),
-                          ],
-                        );
-                      }).toList(),
+                              DataCell(
+                                (fileExists[report['note']] ?? false)
+                                    ? IconButton(
+                                        icon: const Icon(Icons.download),
+                                        onPressed: () =>
+                                            _downloadFile(report['note']),
+                                      )
+                                    : const Text('-'),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ),
