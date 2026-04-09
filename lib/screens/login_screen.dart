@@ -145,109 +145,115 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Icon(Icons.access_time, size: 80, color: Colors.blue),
-                const SizedBox(height: 12),
-                Text(
-                  _isLogin ? "Login Absensi" : "Daftar Akun",
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.access_time, size: 80, color: Colors.blue),
+                  const SizedBox(height: 12),
+                  Text(
+                    _isLogin ? "Login Absensi" : "Daftar Akun",
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 25),
-                ElevatedButton.icon(
-                  onPressed: _isLoading ? null : null,
-                  icon: Image.asset('assets/google.jpg', height: 24),
-                  label: const Text("Sign in with Google"),
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 56),
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    side: const BorderSide(color: Colors.grey),
+                  const SizedBox(height: 25),
+                  ElevatedButton.icon(
+                    onPressed: _isLoading ? null : null,
+                    icon: Image.asset('assets/google.jpg', height: 24),
+                    label: const Text("Sign in with Google"),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 56),
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      side: const BorderSide(color: Colors.grey),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  "or",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: "Email",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "or",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return "Email wajib diisi";
-                    }
-                    if (!_isValidEmail(value)) {
-                      return "Format email tidak valid";
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: "Password",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: "Email",
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.email),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return "Email wajib diisi";
+                      }
+                      if (!_isValidEmail(value)) {
+                        return "Format email tidak valid";
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return "Password wajib diisi";
-                    }
-                    if (value.length < 6) {
-                      return "Password minimal 6 karakter";
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _authenticate,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 56),
-                    backgroundColor: Colors.blue[700],
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: "Password",
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.lock),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return "Password wajib diisi";
+                      }
+                      if (value.length < 6) {
+                        return "Password minimal 6 karakter";
+                      }
+                      return null;
+                    },
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Text(
-                          _isLogin ? "LOGIN" : "DAFTAR",
-                          style: const TextStyle(fontSize: 18),
-                        ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => setState(() => _isLogin = !_isLogin),
-                  child: Text(
-                    _isLogin
-                        ? "Belum punya akun? Daftar"
-                        : "Sudah punya akun? Login",
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _authenticate,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 56),
+                      backgroundColor: Colors.blue[700],
+                      foregroundColor: Colors.white,
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : Text(
+                            _isLogin ? "LOGIN" : "DAFTAR",
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
-                ),
-                if (_isLogin)
+                  const SizedBox(height: 12),
                   TextButton(
-                    onPressed: _resetPassword,
-                    child: const Text("Lupa Password?"),
+                    onPressed: () => setState(() => _isLogin = !_isLogin),
+                    child: Text(
+                      _isLogin
+                          ? "Belum punya akun? Daftar"
+                          : "Sudah punya akun? Login",
+                    ),
                   ),
-              ],
+                  if (_isLogin)
+                    TextButton(
+                      onPressed: _resetPassword,
+                      child: const Text("Lupa Password?"),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

@@ -1,6 +1,7 @@
 import 'package:absen/bloc/attendance/attendance_state.dart';
 import 'package:absen/screens/bib_screen.dart';
 import 'package:absen/screens/clock_action_screen.dart';
+import 'package:absen/screens/dailyreport.dart';
 import 'package:absen/screens/ijin_screen.dart';
 import 'package:absen/screens/login_screen.dart';
 import 'package:absen/screens/sakit_screen.dart';
@@ -63,7 +64,7 @@ class AuthWrapper extends StatelessWidget {
           } else {
             return BlocProvider(
               create: (_) => AttendanceBloc(),
-              child: AttendanceHome(),
+              child: DailyReportScreen(),
             );
           }
         },

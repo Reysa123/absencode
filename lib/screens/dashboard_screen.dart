@@ -17,15 +17,41 @@ class DashboardScreen extends StatelessWidget {
         title: const Text("Dashboard Absensi"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
-              //await Supabase.instance.client.auth.signOut();
+            icon: const Icon(Icons.logout, color: Colors.red),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: const Text('Konfirmasi Logout'),
+                    content: const Text('Apakah Anda yakin ingin logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.clear();
+                          //await Supabase.instance.client.auth.signOut();
 
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const AuthWrapper()),
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AuthWrapper(),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Logout',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -149,11 +175,16 @@ class DashboardScreen extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         minimumSize: const Size(double.infinity, 60),
         backgroundColor: Colors.blue[700],
+        foregroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
       ),
     );
   }

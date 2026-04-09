@@ -23,7 +23,8 @@ class _UserDataScreenState extends State<UserDataScreen> {
 
   final supabase = Supabase.instance.client;
   bool _isLoading = false;
-
+  bool isData = false;
+  
   String _formatDate(DateTime date) {
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
@@ -50,7 +51,10 @@ class _UserDataScreenState extends State<UserDataScreen> {
   }
 
   Future<void> _loadUserData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      isData = false;
+    });
 
     final response = await supabase
         .from('user')
@@ -66,6 +70,7 @@ class _UserDataScreenState extends State<UserDataScreen> {
       _endController.text = data['end1'] ?? '';
       _start2Controller.text = data['start2'] ?? '';
       _end2Controller.text = data['end2'] ?? '';
+      if (mounted) setState(() => isData = true);
     }
     await SharedPreferences.getInstance().then((prefs) {
       prefs.setString('userid', widget.userId);
@@ -74,39 +79,48 @@ class _UserDataScreenState extends State<UserDataScreen> {
   }
 
   Future<void> _saveUserData() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      await supabase.from('user').insert({
-        'userid': widget.userId.toString(),
-        'nama': _namaController.text.trim(),
-        'alamatsekolah': _alamatController.text.trim(),
-        'start1': _startController.text.trim(),
-        'end1': _endController.text.trim(),
-        'start2': _start2Controller.text.trim(),
-        'end2': _end2Controller.text.trim(),
-      });
-
-      Fluttertoast.showToast(
-        msg: "Data tersimpan",
-        toastLength: Toast.LENGTH_LONG,
-      );
-
+    if (isData) {
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const AuthWrapper()),
         );
       }
-    } catch (e) {
-      Fluttertoast.showToast(
-        msg: "Gagal menyimpan data: $e",
-        toastLength: Toast.LENGTH_LONG,
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } else {
+      if (!_formKey.currentState!.validate()) return;
+
+      setState(() => _isLoading = true);
+
+      try {
+        await supabase.from('user').insert({
+          'userid': widget.userId.toString(),
+          'nama': _namaController.text.trim(),
+          'alamatsekolah': _alamatController.text.trim(),
+          'start1': _startController.text.trim(),
+          'end1': _endController.text.trim(),
+          'start2': _start2Controller.text.trim(),
+          'end2': _end2Controller.text.trim(),
+        });
+
+        Fluttertoast.showToast(
+          msg: "Data tersimpan",
+          toastLength: Toast.LENGTH_LONG,
+        );
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AuthWrapper()),
+          );
+        }
+      } catch (e) {
+        Fluttertoast.showToast(
+          msg: "Gagal menyimpan data: $e",
+          toastLength: Toast.LENGTH_LONG,
+        );
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -188,9 +202,9 @@ class _UserDataScreenState extends State<UserDataScreen> {
                     hintText: "dd mm yyyy",
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) => value == null || value.isEmpty
-                      ? "Start 2 wajib diisi"
-                      : null,
+                  // validator: (value) => value == null || value.isEmpty
+                  //     ? "Start 2 wajib diisi"
+                  //     : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -201,9 +215,9 @@ class _UserDataScreenState extends State<UserDataScreen> {
                     hintText: "dd mm yyyy",
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) => value == null || value.isEmpty
-                      ? "End 2 wajib diisi"
-                      : null,
+                  // validator: (value) => value == null || value.isEmpty
+                  //     ? "End 2 wajib diisi"
+                  //     : null,
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(

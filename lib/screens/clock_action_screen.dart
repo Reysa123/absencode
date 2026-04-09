@@ -42,12 +42,17 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
   Widget build(BuildContext context) {
     return BlocBuilder<AttendanceBloc, AttendanceState>(
       builder: (context, state) {
-        if (!state.isWithinRadius) {
+        if (state.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!state.isLoading && !state.isWithinRadius) {
           return const OutOfRadiusScreen();
         }
+        // attendanceBloc.add(StopLocationUpdates());
         final bloc = context.read<AttendanceBloc>();
         final isClockIn = state.currentView == 'clock-in';
-        print(state.toString());
+        //print(state.toString());
+        attendanceBloc.add(StopLocationUpdates());
         return Scaffold(
           appBar: AppBar(
             title: Text(isClockIn ? 'Clock In' : 'Clock Out'),
@@ -62,7 +67,7 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
               FlutterMap(
                 mapController: mapController,
                 options: MapOptions(
-                  initialCenter: const LatLng(-8.641514, 115.209754),
+                  initialCenter: const LatLng(-8.642514, 115.210754),
                   initialZoom: 18.0,
                 ),
                 children: [
