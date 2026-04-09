@@ -33,7 +33,7 @@ class IjinScreen extends StatelessWidget {
                     hintText: "Tuliskan alasan ijin Anda...",
                   ),
                   onChanged: (value) {
-                    bloc.add(SubmitIjin(value));
+                    state.copyWith(ijinReason: value);
                     // Untuk simplicity, kita simpan di state
                     // Bisa di-improve dengan TextEditingController
                   },
@@ -46,7 +46,7 @@ class IjinScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 56)),
                   child: state.isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("KIRIM PERMOHONAN IJIN", style: TextStyle(fontSize: 18)),
+                      : const Text("KIRIM PERMOHONAN IJIN", style: TextStyle(fontSize: 18,color: Colors.black)),
                 ),
               ],
             ),

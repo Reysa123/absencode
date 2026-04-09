@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'attendance_event.dart';
 import 'attendance_state.dart';
@@ -199,8 +198,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
           maximumAge: Duration(minutes: 5),
         ),
       );
-      print(pos.isMocked);
-      print(pos.longitude);
+      // print(pos.isMocked);
+      // print(pos.longitude);
       //final isMock = await TrustLocation.isMockLocation;
       final dist = _calculateDistance(
         pos.latitude,
@@ -263,7 +262,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       lng: state.position?.longitude,
       distance: state.distance,
     );
-    Fluttertoast.showToast(msg: "Clock In berhasil!");
+    Fluttertoast.showToast(
+      msg: "Clock In berhasil!",
+      toastLength: Toast.LENGTH_LONG,
+    );
     add(ChangeView('dashboard'));
   }
 
@@ -282,7 +284,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       lng: state.position?.longitude,
       distance: state.distance,
     );
-    Fluttertoast.showToast(msg: "Clock Out berhasil!");
+    Fluttertoast.showToast(
+      msg: "Clock Out berhasil!",
+      toastLength: Toast.LENGTH_LONG,
+    );
     add(ChangeView('dashboard'));
   }
 
@@ -304,7 +309,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     emit(state.copyWith(isLoading: false));
 
     if (success) {
-      Fluttertoast.showToast(msg: "Permohonan ijin berhasil dikirim!");
+      Fluttertoast.showToast(
+        msg: "Permohonan ijin berhasil dikirim!",
+        toastLength: Toast.LENGTH_LONG,
+      );
       emit(state.copyWith(ijinReason: '', currentView: 'dashboard'));
     }
   }
@@ -313,7 +321,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     SubmitBIB event,
     Emitter<AttendanceState> emit,
   ) async {
-    Fluttertoast.showToast(msg: "Absensi BIB berhasil!");
+    Fluttertoast.showToast(
+      msg: "Absensi BIB berhasil!",
+      toastLength: Toast.LENGTH_LONG,
+    );
     add(ChangeView('dashboard'));
   }
 
@@ -325,14 +336,14 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     emit(state.copyWith(isLoading: true));
 
     final success = await _uploadToServer("sakit", file: state.sickFile);
-    await _insertAttendanceToSupabase(
-      status: 'sakit',
-      note: "Surat sakit diupload",
-    );
+
     emit(state.copyWith(isLoading: false));
 
     if (success) {
-      Fluttertoast.showToast(msg: "Surat sakit berhasil dikirim ke server!");
+      Fluttertoast.showToast(
+        msg: "Surat sakit berhasil dikirim!",
+        toastLength: Toast.LENGTH_LONG,
+      );
       add(ClearSickFile());
       add(ChangeView('dashboard'));
     }
@@ -360,19 +371,53 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     String? reason,
   }) async {
     try {
-      final url = Uri.parse("https://jsonplaceholder.typicode.com/posts");
-      final request = http.MultipartRequest('POST', url);
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception("User belum login");
 
-      request.fields['type'] = type;
-      request.fields['date'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      if (reason != null) request.fields['reason'] = reason;
+      final now = DateTime.now();
+      final dateStr = DateFormat('yyyy-MM-dd').format(now);
+      final fileName =
+          '${user.id}/${type}_${dateStr}_${DateTime.now().millisecondsSinceEpoch}.${file?.name.split('.').last}';
+
+      // Upload file ke Supabase Storage
       if (file != null) {
-        request.files.add(await http.MultipartFile.fromPath('file', file.path));
+        final fileBytes = await file.readAsBytes();
+        await supabase.storage
+            .from('absen')
+            .uploadBinary(
+              fileName,
+              fileBytes,
+              fileOptions: const FileOptions(
+                cacheControl: '3600',
+                upsert: false,
+              ),
+            );
       }
 
-      final response = await request.send();
-      return response.statusCode < 300;
+      // Simpan metadata ke database
+      await supabase.from('attendance').insert({
+        'userid': user.id.toString(),
+        'date': dateStr,
+        'status': type,
+        'note': file != null ? fileName : null,
+        'clock_in': '08:00',
+        'clock_out': '17:00',
+        'latitude': state.position?.latitude.toString(),
+        'longitude': state.position?.longitude.toString(),
+        'distance_meters': state.distance.toString(),
+      });
+
+      Fluttertoast.showToast(
+        msg: "Upload ke Server berhasil!",
+        toastLength: Toast.LENGTH_LONG,
+      );
+      return true;
     } catch (e) {
+      Fluttertoast.showToast(
+        msg: "Gagal upload: $e",
+        toastLength: Toast.LENGTH_LONG,
+      );
+      print(e.toString());
       return false;
     }
   }

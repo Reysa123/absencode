@@ -63,7 +63,7 @@ class SakitScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 56)),
                   child: state.isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("KIRIM SURAT SAKIT", style: TextStyle(fontSize: 18)),
+                      : const Text("KIRIM SURAT SAKIT", style: TextStyle(fontSize: 18,color: Colors.black)),
                 ),
               ],
             ),

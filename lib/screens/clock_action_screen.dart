@@ -75,13 +75,13 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                   MarkerLayer(
                     markers: [
                       //Marker(
-                     // pointt: const LatLng(-8.641514, 115.209754),
-                       // child: const Icon(
-                       //   Icons.location_on,
+                      // pointt: const LatLng(-8.641514, 115.209754),
+                      // child: const Icon(
+                      //   Icons.location_on,
                       //    color: Colors.red,
-                    //      size: 40,
-                    //    ),
-                  //    ),
+                      //      size: 40,
+                      //    ),
+                      //    ),
                       if (state.position != null)
                         Marker(
                           point: LatLng(
@@ -101,6 +101,7 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                       CircleMarker(
                         point: const LatLng(-8.641514, 115.209754),
                         radius: 100,
+                        useRadiusInMeter: true,
                         color: Colors.green.withAlpha(38),
                         borderColor: Colors.green,
                         borderStrokeWidth: 2,
@@ -165,6 +166,7 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 60),
                           backgroundColor: Colors.blue[700],
+                          foregroundColor: Colors.white,
                         ),
                         child: const Text(
                           "SUBMIT ABSENSI",
