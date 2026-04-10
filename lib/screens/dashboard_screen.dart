@@ -32,17 +32,19 @@ class DashboardScreen extends StatelessWidget {
                       ),
                       TextButton(
                         onPressed: () async {
-                          Navigator.of(context).pop();
                           final prefs = await SharedPreferences.getInstance();
                           await prefs.clear();
                           //await Supabase.instance.client.auth.signOut();
 
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const AuthWrapper(),
-                            ),
-                          );
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AuthWrapper(),
+                              ),
+                            );
+                          }
                         },
                         child: const Text(
                           'Logout',

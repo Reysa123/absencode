@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:absen/bloc/attendance/attendance_state.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -51,7 +52,9 @@ class SakitScreen extends StatelessWidget {
                           )
                         : ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: Image.file(File(state.sickFile!.path), fit: BoxFit.cover),
+                            child: kIsWeb
+                                ? Image.network(state.sickFile!.path, fit: BoxFit.cover)
+                                : Image.file(File(state.sickFile!.path), fit: BoxFit.cover),
                           ),
                   ),
                 ),

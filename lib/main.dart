@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:absen/bloc/attendance/attendance_state.dart';
 import 'package:absen/screens/bib_screen.dart';
 import 'package:absen/screens/clock_action_screen.dart';
@@ -11,9 +13,28 @@ import 'bloc/attendance/attendance_bloc.dart';
 import 'screens/dashboard_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+const MethodChannel _devOptionsChannel = MethodChannel('absen.dev_options');
+bool developerOptionsEnabled = false;
+
+Future<bool> _checkDeveloperOptions() async {
+  if (!Platform.isAndroid && !Platform.isIOS) return false;
+
+  try {
+    final enabled = await _devOptionsChannel.invokeMethod<bool>('isDeveloperOptionsEnabled');
+    return enabled ?? false;
+  } catch (_) {
+    return false;
+  }
+}
+
 late SharedPreferences pref;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if(Platform.isAndroid){
+  developerOptionsEnabled = await _checkDeveloperOptions();
+  if (developerOptionsEnabled) {
+    debugPrint('Developer options aktif pada perangkat.');
+  }}
   pref = await SharedPreferences.getInstance();
   await Supabase.initialize(
     url: 'https://yqyjnwclewpmlpvmjnzq.supabase.co', // Ganti dengan URL Anda
@@ -101,7 +122,29 @@ class AttendanceHome extends StatelessWidget {
             currentScreen = const DashboardScreen();
         }
 
-        return Scaffold(body: SafeArea(child: currentScreen));
+        return Scaffold(
+          body: SafeArea(
+            child: Column(
+              children: [
+                if (developerOptionsEnabled)
+                  Container(
+                    width: double.infinity,
+                    color: Colors.red.shade700,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                    child: const Text(
+                      'Developer options aktif. Fitur lokasi dan keamanan mungkin terpengaruh.',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                Expanded(child: currentScreen),
+              ],
+            ),
+          ),
+        );
       },
     );
   }

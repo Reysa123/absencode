@@ -56,22 +56,21 @@ class _LoginScreenState extends State<LoginScreen> {
         final response = await supabase.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
+          emailRedirectTo: kIsWeb ? null : 'absen://callback', // Ganti dengan scheme app Anda
         );
 
         final user = response.user;
         if (user != null) {
-          final pref = await SharedPreferences.getInstance();
-          await pref.setString('user', _emailController.text.trim());
-          await pref.setString('pass', _passwordController.text.trim());
           Fluttertoast.showToast(
-            msg: "Registrasi berhasil! Silakan lengkapi data.",
+            msg: "Registrasi berhasil! Silakan periksa email Anda untuk konfirmasi.",
             toastLength: Toast.LENGTH_LONG,
           );
-          if (mounted) _navigateToUserData(user.id);
+          // Jangan save credentials atau navigate sampai confirmed
         }
       }
     } catch (e) {
       Fluttertoast.showToast(
+        webShowClose: true,
         msg: "Error: ${e.toString()}",
         toastLength: Toast.LENGTH_LONG,
       );
@@ -84,13 +83,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final userid = await SharedPreferences.getInstance().then(
       (prefs) => prefs.getString('userid'),
     );
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            userid != null ? AuthWrapper() : UserDataScreen(userId: userId),
-      ),
-    );
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              userid != null ? AuthWrapper() : UserDataScreen(userId: userId),
+        ),
+      );
+    }
   }
 
   Future<void> _signInWithGoogle() async {
@@ -154,6 +155,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (developerOptionsEnabled)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade700,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Developer options aktif. Fitur lokasi dan keamanan mungkin terpengaruh.',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  const SizedBox(height: 12),
                   const Icon(Icons.access_time, size: 80, color: Colors.blue),
                   const SizedBox(height: 12),
                   Text(
@@ -166,7 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 25),
                   ElevatedButton.icon(
-                    onPressed: _isLoading ? null : null,
+                    onPressed: _isLoading ? null : _signInWithGoogle,
                     icon: Image.asset('assets/google.jpg', height: 24),
                     label: const Text("Sign in with Google"),
                     style: ElevatedButton.styleFrom(
