@@ -68,11 +68,7 @@ class _ClockActionScreenState extends State<ClockActionScreen> {
                 mapController: mapController,
                 options: MapOptions(
                   initialCenter: const LatLng(-8.642514, 115.210754),
-                  initialZoom: 18.0,
-                  initialCameraFit: CameraFit.bounds(bounds:  LatLngBounds(
-        const LatLng(41.0, 26.2), 
-        const LatLng(36.7, 47.0),
-      ),)
+                  initialZoom: 13.0,
                 ),
                 children: [
                   TileLayer(
