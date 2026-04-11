@@ -18,7 +18,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
+  late final StreamSubscription authSub;
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _isLogin = true;
@@ -32,7 +32,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _authenticate() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      log_in = true;
+    });
 
     try {
       if (_isLogin) {
@@ -51,20 +54,33 @@ class _LoginScreenState extends State<LoginScreen> {
             toastLength: Toast.LENGTH_LONG,
           );
           if (mounted) _navigateToUserData(user.id);
+          setState(() {
+            _isLoading = false;
+            log_in = false;
+          });
         }
       } else {
+        setState(() {
+          _isLoading = true;
+        });
         final response = await supabase.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
-          emailRedirectTo: kIsWeb ? null : 'absen://callback', // Ganti dengan scheme app Anda
+          emailRedirectTo: kIsWeb
+              ? null
+              : 'absen://callback', // Ganti dengan scheme app Anda
         );
 
         final user = response.user;
         if (user != null) {
           Fluttertoast.showToast(
-            msg: "Registrasi berhasil! Silakan periksa email Anda untuk konfirmasi.",
+            webShowClose: true,
+            msg:
+                "Registrasi berhasil! Silakan periksa email Anda untuk konfirmasi.",
             toastLength: Toast.LENGTH_LONG,
           );
+          // late final StreamSubscription authSub;
+
           // Jangan save credentials atau navigate sampai confirmed
         }
       }
@@ -91,13 +107,15 @@ class _LoginScreenState extends State<LoginScreen> {
               userid != null ? AuthWrapper() : UserDataScreen(userId: userId),
         ),
       );
+      setState(() {
+        log_in = false;
+      });
     }
   }
 
   Future<void> _signInWithGoogle() async {
     // setState(() => _isLoading = true);
 
-    late final StreamSubscription authSub;
     authSub = supabase.auth.onAuthStateChange.listen((data) {
       final event = data.event;
       final user = data.session?.user;
@@ -142,6 +160,26 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  bool log_in = false;
+  @override
+  void initState() {
+    super.initState();
+    authSub = supabase.auth.onAuthStateChange.listen((data) {
+      final AuthChangeEvent event = data.event;
+      print(event);
+      if (event == AuthChangeEvent.signedIn) {
+        setState(() {
+          _isLoading = false;
+          log_in = false;
+        });
+        // Hentikan listener setelah login berhasil
+        if (mounted) _navigateToUserData(data.session!.user.id);
+        authSub.cancel();
+        // Email is now confirmed and user is logged in
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -158,7 +196,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (developerOptionsEnabled)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 16,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.red.shade700,
                         borderRadius: BorderRadius.circular(12),
@@ -249,6 +290,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
+                        : log_in
+                        ? const CircularProgressIndicator()
                         : Text(
                             _isLogin ? "LOGIN" : "DAFTAR",
                             style: const TextStyle(

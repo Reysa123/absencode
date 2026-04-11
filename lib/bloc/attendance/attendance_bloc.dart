@@ -328,8 +328,24 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     Emitter<AttendanceState> emit,
   ) async {
     emit(state.copyWith(isLoading: true));
+    final user = supabase.auth.currentUser;
+    if (user == null) throw Exception("User belum login");
+
+    final now = DateTime.now();
     final success = await _uploadToServer("ijin", reason: event.reason);
-    await _insertAttendanceToSupabase(status: 'ijin', note: event.reason);
+    // await _insertAttendanceToSupabase(status: 'ijin', note: event.reason);
+    await supabase.from('attendance').insert({
+      'userid': user.id.toString(),
+
+      'date': now.toIso8601String(),
+      'status': 'ijin',
+      'note': event.reason,
+      'clock_in': now.toIso8601String(),
+      'clock_out': now.toIso8601String(),
+      'latitude': state.position?.latitude.toString(),
+      'longitude': state.position?.longitude.toString(),
+      'distance_meters': state.distance.toString(),
+    });
     emit(state.copyWith(isLoading: false));
 
     if (success) {
@@ -417,15 +433,14 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
               ),
             );
       }
-
       // Simpan metadata ke database
       await supabase.from('attendance').insert({
         'userid': user.id.toString(),
         'date': dateStr,
         'status': type,
         'note': file != null ? fileName : null,
-        'clock_in': '08:00',
-        'clock_out': '17:00',
+        'clock_in': now.toIso8601String(),
+        'clock_out': now.toIso8601String(),
         'latitude': state.position?.latitude.toString(),
         'longitude': state.position?.longitude.toString(),
         'distance_meters': state.distance.toString(),
@@ -441,7 +456,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         msg: "Gagal upload: $e",
         toastLength: Toast.LENGTH_LONG,
       );
-      print(e.toString());
+      // print(e.toString());
       return false;
     }
   }

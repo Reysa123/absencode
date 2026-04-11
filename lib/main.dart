@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:absen/screens/dailyreport.dart';
 import 'package:flutter/services.dart';
 import 'package:absen/bloc/attendance/attendance_state.dart';
 import 'package:absen/screens/bib_screen.dart';
@@ -11,6 +12,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bloc/attendance/attendance_bloc.dart';
 import 'screens/dashboard_screen.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const MethodChannel _devOptionsChannel = MethodChannel('absen.dev_options');
@@ -20,7 +22,9 @@ Future<bool> _checkDeveloperOptions() async {
   if (!Platform.isAndroid && !Platform.isIOS) return false;
 
   try {
-    final enabled = await _devOptionsChannel.invokeMethod<bool>('isDeveloperOptionsEnabled');
+    final enabled = await _devOptionsChannel.invokeMethod<bool>(
+      'isDeveloperOptionsEnabled',
+    );
     return enabled ?? false;
   } catch (_) {
     return false;
@@ -30,11 +34,12 @@ Future<bool> _checkDeveloperOptions() async {
 late SharedPreferences pref;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if(Platform.isAndroid){
-  developerOptionsEnabled = await _checkDeveloperOptions();
-  if (developerOptionsEnabled) {
-    debugPrint('Developer options aktif pada perangkat.');
-  }}
+  if (!kIsWeb) {
+    developerOptionsEnabled = await _checkDeveloperOptions();
+    if (developerOptionsEnabled) {
+      debugPrint('Developer options aktif pada perangkat.');
+    }
+  }
   pref = await SharedPreferences.getInstance();
   await Supabase.initialize(
     url: 'https://yqyjnwclewpmlpvmjnzq.supabase.co', // Ganti dengan URL Anda
@@ -130,7 +135,10 @@ class AttendanceHome extends StatelessWidget {
                   Container(
                     width: double.infinity,
                     color: Colors.red.shade700,
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 16,
+                    ),
                     child: const Text(
                       'Developer options aktif. Fitur lokasi dan keamanan mungkin terpengaruh.',
                       style: TextStyle(
