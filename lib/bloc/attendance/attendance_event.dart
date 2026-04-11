@@ -40,7 +40,7 @@ class PickSickFile extends AttendanceEvent {
 class ClearSickFile extends AttendanceEvent {}
 
 class SubmitIjin extends AttendanceEvent {
-  final String reason;
+   final String reason;
   SubmitIjin(this.reason);
 }
 

@@ -346,7 +346,16 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       'longitude': state.position?.longitude.toString(),
       'distance_meters': state.distance.toString(),
     });
-    emit(state.copyWith(isLoading: false));
+
+    final timeStr = DateFormat('HH:mm').format(state.currentTime);
+    emit(
+      state.copyWith(
+        clockInTime: timeStr,
+        clockOutTime: timeStr,
+        isLoading: false,
+      ),
+    );
+    await _saveAttendance();
 
     if (success) {
       Fluttertoast.showToast(
@@ -377,7 +386,15 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
 
     final success = await _uploadToServer("sakit", file: state.sickFile);
 
-    emit(state.copyWith(isLoading: false));
+    final timeStr = DateFormat('HH:mm').format(state.currentTime);
+    emit(
+      state.copyWith(
+        clockInTime: timeStr,
+        clockOutTime: timeStr,
+        isLoading: false,
+      ),
+    );
+    await _saveAttendance();
 
     if (success) {
       Fluttertoast.showToast(

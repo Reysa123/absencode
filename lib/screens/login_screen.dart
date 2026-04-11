@@ -34,11 +34,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() {
       _isLoading = true;
-      log_in = true;
+      logins = true;
     });
 
     try {
       if (_isLogin) {
+        print('login');
         final response = await supabase.auth.signInWithPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
@@ -56,10 +57,11 @@ class _LoginScreenState extends State<LoginScreen> {
           if (mounted) _navigateToUserData(user.id);
           setState(() {
             _isLoading = false;
-            log_in = false;
+            logins = false;
           });
         }
       } else {
+        print('daftar');
         setState(() {
           _isLoading = true;
         });
@@ -85,10 +87,26 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      Fluttertoast.showToast(
-        webShowClose: true,
-        msg: "Error: ${e.toString()}",
-        toastLength: Toast.LENGTH_LONG,
+      setState(() {
+        _isLoading = false;
+        logins = false;
+      });
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Error"),
+          content: e.toString().contains('invalid_credentials')
+              ? Text(
+                  "Gagal ${_isLogin ? 'login' : 'daftar'}\nPastikan email dan password benar, dan periksa koneksi internet.\nAtau Daftar Akun Baru jika belum punya akun.",
+                )
+              : Text("Gagal ${_isLogin ? 'login' : 'daftar'}\nError: $e"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -108,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
       setState(() {
-        log_in = false;
+        logins = false;
       });
     }
   }
@@ -160,23 +178,57 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  bool log_in = false;
+  bool logins = false;
+
   @override
   void initState() {
     super.initState();
+    // start();
+  }
+
+  Future<void> start() async {
     authSub = supabase.auth.onAuthStateChange.listen((data) {
       final AuthChangeEvent event = data.event;
-      print(event);
+      final session = data.session;
+
+      print(session?.user.emailConfirmedAt);
       if (event == AuthChangeEvent.signedIn) {
         setState(() {
           _isLoading = false;
-          log_in = false;
+          logins = false;
         });
         // Hentikan listener setelah login berhasil
         if (mounted) _navigateToUserData(data.session!.user.id);
-        authSub.cancel();
+        //authSub.cancel();
         // Email is now confirmed and user is logged in
       }
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Info"),
+          content: Text(
+            "Link email dikirim! Silakan periksa email Anda untuk konfirmasi.\nJika sudah dikonfirmasi, klik OK untuk melanjutkan.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  authSub.cancel();
+                  _isLoading = false;
+                  _isLogin = true;
+                });
+                if (session != null) {
+                  Navigator.pop(context);
+                  if (mounted) _navigateToUserData(session.user.id);
+                } else {
+                  if (mounted) _navigateToUserData("");
+                }
+              },
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
     });
   }
 
@@ -290,7 +342,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : log_in
+                        : logins
                         ? const CircularProgressIndicator()
                         : Text(
                             _isLogin ? "LOGIN" : "DAFTAR",
@@ -327,6 +379,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+
     super.dispose();
   }
 }

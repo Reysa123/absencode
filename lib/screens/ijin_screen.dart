@@ -4,13 +4,18 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/attendance/attendance_bloc.dart';
 import '../bloc/attendance/attendance_event.dart';
 
-class IjinScreen extends StatelessWidget {
+class IjinScreen extends StatefulWidget {
   const IjinScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final bloc = context.read<AttendanceBloc>();
+  State<IjinScreen> createState() => _IjinScreenState();
+}
 
+class _IjinScreenState extends State<IjinScreen> {
+  String _reason = '';
+
+  @override
+  Widget build(BuildContext context) {
     return BlocBuilder<AttendanceBloc, AttendanceState>(
       builder: (context, state) {
         return Scaffold(
@@ -18,7 +23,8 @@ class IjinScreen extends StatelessWidget {
             title: const Text("Ijin Absensi"),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => bloc.add(ChangeView('dashboard')),
+              onPressed: () =>
+                  context.read<AttendanceBloc>().add(ChangeView('dashboard')),
             ),
           ),
           body: Padding(
@@ -32,24 +38,28 @@ class IjinScreen extends StatelessWidget {
                     border: OutlineInputBorder(),
                     hintText: "Tuliskan alasan ijin Anda...",
                   ),
-                  onChanged: (value) {
-                    state.copyWith(ijinReason: value);
-                    state.copyWith(isLoading: false);
+                  onChanged: (String? value) {
+                    setState(() {
+                      _reason = value!;
+                    });
+
                     // Untuk simplicity, kita simpan di state
                     // Bisa di-improve dengan TextEditingController
                   },
                 ),
                 const Spacer(),
                 ElevatedButton(
-                  onPressed: state.ijinReason.trim().isEmpty || state.isLoading
+                  onPressed: _reason.isEmpty
                       ? null
-                      : () => bloc.add(SubmitIjin(state.ijinReason)),
+                      : () => context.read<AttendanceBloc>().add(
+                          SubmitIjin(_reason.trim()),
+                        ),
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 56),
                   ),
                   child: state.isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
+                      : Text(
                           "KIRIM PERMOHONAN IJIN",
                           style: TextStyle(fontSize: 18, color: Colors.black),
                         ),

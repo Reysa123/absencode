@@ -24,7 +24,7 @@ class _UserDataScreenState extends State<UserDataScreen> {
   final supabase = Supabase.instance.client;
   bool _isLoading = false;
   bool isData = false;
-  
+
   String _formatDate(DateTime date) {
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
@@ -136,106 +136,112 @@ class _UserDataScreenState extends State<UserDataScreen> {
                 child: Form(
                   key: _formKey,
                   child: ListView(
-              children: [
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: widget.userId,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: "ID User",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _namaController,
-                  decoration: const InputDecoration(
-                    labelText: "Nama",
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) => value == null || value.isEmpty
-                      ? "Nama wajib diisi"
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _alamatController,
-                  decoration: const InputDecoration(
-                    labelText: "Alamat Sekolah",
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) => value == null || value.isEmpty
-                      ? "Alamat sekolah wajib diisi"
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _startController,
-                  onTap: () => _pickDate(_startController),
-                  decoration: const InputDecoration(
-                    labelText: "Start 1",
-                    hintText: "dd mm yyyy",
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) => value == null || value.isEmpty
-                      ? "Start 1 wajib diisi"
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _endController,
-                  onTap: () => _pickDate(_endController),
-                  decoration: const InputDecoration(
-                    labelText: "End 1",
-                    hintText: "dd mm yyyy",
+                    children: [
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        initialValue: widget.userId,
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          labelText: "ID User",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _namaController,
+                        decoration: const InputDecoration(
+                          labelText: "Nama",
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.isEmpty
+                            ? "Nama wajib diisi"
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _alamatController,
+                        decoration: const InputDecoration(
+                          labelText: "Alamat Sekolah",
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.isEmpty
+                            ? "Alamat sekolah wajib diisi"
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _startController,
+                        onTap: () => _pickDate(_startController),
+                        decoration: const InputDecoration(
+                          labelText: "Start 1",
+                          hintText: "dd mm yyyy",
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.isEmpty
+                            ? "Start 1 wajib diisi"
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _endController,
+                        onTap: () => _pickDate(_endController),
+                        decoration: const InputDecoration(
+                          labelText: "End 1",
+                          hintText: "dd mm yyyy",
 
-                    border: OutlineInputBorder(),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.isEmpty
+                            ? "End 1 wajib diisi"
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _start2Controller,
+                        onTap: () => _pickDate(_start2Controller),
+                        decoration: const InputDecoration(
+                          labelText: "Start 2",
+                          hintText: "dd mm yyyy",
+                          border: OutlineInputBorder(),
+                        ),
+                        // validator: (value) => value == null || value.isEmpty
+                        //     ? "Start 2 wajib diisi"
+                        //     : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _end2Controller,
+                        onTap: () => _pickDate(_end2Controller),
+                        decoration: const InputDecoration(
+                          labelText: "End 2",
+                          hintText: "dd mm yyyy",
+                          border: OutlineInputBorder(),
+                        ),
+                        // validator: (value) => value == null || value.isEmpty
+                        //     ? "End 2 wajib diisi"
+                        //     : null,
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _saveUserData,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 56),
+                          foregroundColor: Colors.white,
+                          backgroundColor: _isLoading
+                              ? Colors.grey
+                              : Colors.blue,
+                        ),
+                        child: _isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text("Simpan Data"),
+                      ),
+                    ],
                   ),
-                  validator: (value) => value == null || value.isEmpty
-                      ? "End 1 wajib diisi"
-                      : null,
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _start2Controller,
-                  onTap: () => _pickDate(_start2Controller),
-                  decoration: const InputDecoration(
-                    labelText: "Start 2",
-                    hintText: "dd mm yyyy",
-                    border: OutlineInputBorder(),
-                  ),
-                  // validator: (value) => value == null || value.isEmpty
-                  //     ? "Start 2 wajib diisi"
-                  //     : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _end2Controller,
-                  onTap: () => _pickDate(_end2Controller),
-                  decoration: const InputDecoration(
-                    labelText: "End 2",
-                    hintText: "dd mm yyyy",
-                    border: OutlineInputBorder(),
-                  ),
-                  // validator: (value) => value == null || value.isEmpty
-                  //     ? "End 2 wajib diisi"
-                  //     : null,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _saveUserData,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 56),
-                  ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("Simpan Data"),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
