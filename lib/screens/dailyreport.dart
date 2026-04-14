@@ -145,29 +145,38 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
               pw.Text(
                 'Laporan Absensi Bulan $selectedMonth',
                 style: pw.TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
               pw.Text(
                 selectedName != null ? 'Nama    : $selectedName' : 'Semua Nama',
-                style: pw.TextStyle(fontSize: 12),
+                style: pw.TextStyle(fontSize: 10),
               ),
               pw.Text(
                 'Sekolah :${filteredReports.isNotEmpty ? filteredReports[0]['user']['alamatsekolah'] : '-'}',
-                style: pw.TextStyle(fontSize: 12),
+                style: pw.TextStyle(fontSize: 10),
               ),
               pw.SizedBox(height: 20),
               pw.TableHelper.fromTextArray(
-                cellStyle: pw.TextStyle(fontSize: 12),
+                cellStyle: pw.TextStyle(fontSize: 8),
                 headerStyle: pw.TextStyle(
-                  fontSize: 14,
+                  fontSize: 10,
                   fontWeight: pw.FontWeight.bold,
                 ),
-                headers: ['Tanggal', 'Clock In', 'Clock Out', 'Note'],
+                headers: [
+                  'No',
+                  'Tanggal',
+                  'Clock In',
+                  'Clock Out',
+                  'InRadius',
+                  'OutRadius',
+                  'Note',
+                ],
                 data: filteredReports
                     .map(
                       (report) => [
+                        filteredReports.indexOf(report) + 1,
                         report['date'] ?? '-',
                         report['clock_in'] != null
                             ? DateFormat(
@@ -179,6 +188,8 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
                                 'HH:mm',
                               ).format(DateTime.parse(report['clock_out']))
                             : '-',
+                        report['radin'] == true ? 'Ya' : 'Tidak',
+                        report['radout'] == true ? 'Ya' : 'Tidak',
                         report['note'] ?? '-',
                       ],
                     )
@@ -196,16 +207,13 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
         throw Exception('PDF kosong');
       }
 
-      await Printing.sharePdf(
-        bytes: bytes,
-        filename: _pdfFileName(),
-      );
+      await Printing.sharePdf(bytes: bytes, filename: _pdfFileName());
     } catch (e) {
       debugPrint('Error sharing PDF: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal membagikan PDF: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal membagikan PDF: $e')));
     }
   }
 
@@ -221,7 +229,7 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _fetchReports,
-            child: Column(
+              child: Column(
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(8.0),
@@ -266,7 +274,7 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
                                   ...availableNames.map((name) {
                                     return DropdownMenuItem<String>(
                                       value: name,
-                                      child: Text(name),
+                                      child: Text(name, softWrap: false),
                                     );
                                   }),
                                 ],
@@ -328,7 +336,7 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
                       ),
                     ),
                   ),
-            
+
                   Expanded(
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -354,7 +362,9 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
                               cells: [
                                 DataCell(Text(report['status'] ?? '-')),
                                 DataCell(Text(profile?['nama'] ?? '-')),
-                                DataCell(Text(profile?['alamatsekolah'] ?? '-')),
+                                DataCell(
+                                  Text(profile?['alamatsekolah'] ?? '-'),
+                                ),
                                 DataCell(Text(report['date'] ?? '-')),
                                 DataCell(
                                   Text(
@@ -392,7 +402,7 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
                   ),
                 ],
               ),
-          ),
+            ),
     );
   }
 

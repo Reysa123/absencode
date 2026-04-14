@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:absen/main.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
@@ -59,6 +60,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     Emitter<AttendanceState> emit,
   ) async {
     final prefs = await SharedPreferences.getInstance();
+
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final clockIn = prefs.getString('clockIn_$today');
     final clockOut = prefs.getString('clockOut_$today');
@@ -84,6 +86,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     double? lat,
     double? lng,
     double? distance,
+    bool? radin,
+    bool? radout,
   }) async {
     List<Map<String, dynamic>> id = [];
     try {
@@ -101,6 +105,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
               'latitude': lat.toString(),
               'longitude': lng.toString(),
               'distance_meters': distance.toString(),
+              'radin': radin ?? true,
+              'radout': radout ?? true,
             })
             .eq('id', attendanceId);
         return attendanceId;
@@ -118,6 +124,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         'longitude': lng.toString(),
         'distance_meters': distance.toString(),
         'note': note,
+        'radin': radin ?? true,
+        'radout': radout ?? true,
       }).select();
 
       Fluttertoast.showToast(msg: "Data berhasil disimpan ke Supabase");
@@ -268,8 +276,15 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   }
 
   Future<void> _onClockIn(ClockIn event, Emitter<AttendanceState> emit) async {
-    if (state.isMockDetected || !state.isWithinRadius) return;
-
+    if (state.isMockDetected || !state.isWithinRadius) {
+      await SharedPreferences.getInstance().then((pref) {
+        pref.setInt('keluar', 2);
+      });
+      return;
+    }
+    await SharedPreferences.getInstance().then((pref) {
+      pref.setInt('keluar', 0);
+    });
     final timeStr = DateFormat('HH:mm').format(state.currentTime);
     emit(state.copyWith(clockInTime: timeStr));
     await _saveAttendance();
@@ -294,7 +309,15 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     ClockOut event,
     Emitter<AttendanceState> emit,
   ) async {
-    if (state.isMockDetected || !state.isWithinRadius) return;
+    if (state.isMockDetected || !state.isWithinRadius) {
+      await SharedPreferences.getInstance().then((pref) {
+        pref.setInt('keluar', 1);
+      });
+      return;
+    }
+    await SharedPreferences.getInstance().then((pref) {
+      pref.setInt('keluar', 0);
+    });
     final attendanceId = await SharedPreferences.getInstance().then(
       (prefs) => prefs.getInt('attendanceId') ?? 0,
     );
@@ -330,10 +353,35 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     emit(state.copyWith(isLoading: true));
     final user = supabase.auth.currentUser;
     if (user == null) throw Exception("User belum login");
-
+    final keluar = await SharedPreferences.getInstance().then(
+      (pref) => pref.getInt('keluar') ?? 0,
+    );
     final now = DateTime.now();
     final success = await _uploadToServer("ijin", reason: event.reason);
     // await _insertAttendanceToSupabase(status: 'ijin', note: event.reason);
+    if (keluar != 0) {
+      final attendanceId = await SharedPreferences.getInstance().then(
+        (prefs) => prefs.getInt('attendanceId') ?? 0,
+      );
+      final timeStr = DateFormat('HH:mm').format(state.currentTime);
+      keluar == 1
+          ? emit(state.copyWith(clockOutTime: timeStr))
+          : emit(state.copyWith(clockInTime: timeStr));
+      await _saveAttendance();
+      await _insertAttendanceToSupabase(
+        attendanceId: attendanceId,
+        status: keluar == 1 ? 'clock-out' : 'clock-in',
+        lat: state.position?.latitude,
+        lng: state.position?.longitude,
+        distance: state.distance,
+        note: event.reason,
+        radin: keluar == 2 ? false : true,
+        radout: keluar == 1 ? false : true,
+      );
+      await SharedPreferences.getInstance().then(
+        (pref) => pref.setInt('keluar', 0),
+      );
+    }
     await supabase.from('attendance').insert({
       'userid': user.id.toString(),
 

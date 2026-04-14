@@ -20,7 +20,7 @@ class _IjinScreenState extends State<IjinScreen> {
       builder: (context, state) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text("Ijin Absensi"),
+            title: const Text("Alasan Absensi"),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: () =>
@@ -34,9 +34,9 @@ class _IjinScreenState extends State<IjinScreen> {
                 TextField(
                   maxLines: 7,
                   decoration: const InputDecoration(
-                    labelText: "Alasan Ijin",
+                    labelText: "Keterangan Alasan",
                     border: OutlineInputBorder(),
-                    hintText: "Tuliskan alasan ijin Anda...",
+                    hintText: "Tuliskan keterangan alasan Anda...",
                   ),
                   onChanged: (String? value) {
                     setState(() {
@@ -60,7 +60,7 @@ class _IjinScreenState extends State<IjinScreen> {
                   child: state.isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : Text(
-                          "KIRIM PERMOHONAN IJIN",
+                          "KIRIM PERMOHONAN",
                           style: TextStyle(fontSize: 18, color: Colors.black),
                         ),
                 ),
