@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:absen/main.dart';
 import 'package:absen/screens/user_data_screen.dart';
+import 'package:absen/verifikasiotpscreen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -65,25 +66,25 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _isLoading = true;
         });
-        final response = await supabase.auth.signUp(
+        await supabase.auth.signInWithOtp(
           email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-          emailRedirectTo: kIsWeb
-              ? null
-              : 'absen://callback', // Ganti dengan scheme app Anda
+          // shouldCreateUser: true,   // otomatis buat user jika belum ada (default true)
+          // emailRedirectTo: 'io.supabase.flutter://login-callback', // opsional untuk deep link
         );
 
-        final user = response.user;
-        if (user != null) {
-          Fluttertoast.showToast(
-            webShowClose: true,
-            msg:
-                "Registrasi berhasil! Silakan periksa email Anda untuk konfirmasi.",
-            toastLength: Toast.LENGTH_LONG,
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Kode OTP telah dikirim ke email')),
           );
-          // late final StreamSubscription authSub;
 
-          // Jangan save credentials atau navigate sampai confirmed
+          // Pindah ke halaman verifikasi OTP
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  VerifyOtpScreen(email: _emailController.text.trim()),
+            ),
+          );
         }
       }
     } catch (e) {
