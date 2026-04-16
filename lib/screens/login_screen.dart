@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:absen/main.dart';
 import 'package:absen/screens/user_data_screen.dart';
-import 'package:absen/verifikasiotpscreen.dart';
+import 'package:absen/screens/verifikasiotpscreen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,6 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _authenticate() async {
+    final pref = await SharedPreferences.getInstance();
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -48,9 +49,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final user = response.user;
         if (user != null) {
-          final pref = await SharedPreferences.getInstance();
           await pref.setString('user', _emailController.text.trim());
           await pref.setString('pass', _passwordController.text.trim());
+
           Fluttertoast.showToast(
             msg: "Login berhasil!",
             toastLength: Toast.LENGTH_LONG,
@@ -66,25 +67,21 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _isLoading = true;
         });
-        await supabase.auth.signInWithOtp(
+        final AuthResponse authResponse = await supabase.auth.signUp(
           email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
           // shouldCreateUser: true,   // otomatis buat user jika belum ada (default true)
           // emailRedirectTo: 'io.supabase.flutter://login-callback', // opsional untuk deep link
         );
-
+        await pref.setString('user', _emailController.text.trim());
+        await pref.setString('pass', _passwordController.text.trim());
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Kode OTP telah dikirim ke email')),
+            const SnackBar(content: Text('Akun berhasil dibuat!')),
           );
 
           // Pindah ke halaman verifikasi OTP
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) =>
-                  VerifyOtpScreen(email: _emailController.text.trim()),
-            ),
-          );
+          _navigateToUserData(authResponse.user!.id);
         }
       }
     } catch (e) {
@@ -100,7 +97,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ? Text(
                   "Gagal ${_isLogin ? 'login' : 'daftar'}\nPastikan email dan password benar, dan periksa koneksi internet.\nAtau Daftar Akun Baru jika belum punya akun.",
                 )
-              : Text("Gagal ${_isLogin ? 'login' : 'daftar'}\nError: $e"),
+              : Text(
+                  "Gagal ${_isLogin ? 'login' : 'daftar'} user sudah terdaftar\nError: $e",
+                ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -180,11 +179,22 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   bool logins = false;
+  void starting() async {
+    final pref = await SharedPreferences.getInstance();
+    final users = pref.getString('user') ?? '';
+    final pass = pref.getString('pass') ?? "";
+    if (users.isNotEmpty && pass.isNotEmpty) {
+      setState(() {
+        _emailController.text = users;
+        _passwordController.text = pass;
+      });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    // start();
+    starting();
   }
 
   Future<void> start() async {
@@ -279,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 25),
                   ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _signInWithGoogle,
+                    onPressed: null,
                     icon: Image.asset('assets/google.jpg', height: 24),
                     label: const Text("Sign in with Google"),
                     style: ElevatedButton.styleFrom(
@@ -297,13 +307,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
+                    textInputAction: TextInputAction.next,
                     controller: _emailController,
+                    autofocus: true,
                     keyboardType: TextInputType.emailAddress,
+                    onFieldSubmitted: (_) => FocusScope.of(
+                      context,
+                    ).nextFocus(), // Pindah ke password
                     decoration: const InputDecoration(
                       labelText: "Email",
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.email),
                     ),
+
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return "Email wajib diisi";
@@ -323,6 +339,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.lock),
                     ),
+                    onFieldSubmitted: (value) => _authenticate(),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return "Password wajib diisi";
@@ -336,11 +353,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _isLoading ? null : _authenticate,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 56),
-                      backgroundColor: Colors.blue[700],
-                      foregroundColor: Colors.white,
-                    ),
+                    style: _isLogin
+                        ? ElevatedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 56),
+                            backgroundColor: Colors.blue[700],
+                            foregroundColor: Colors.white,
+                          )
+                        : ElevatedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 56),
+                            backgroundColor: Colors.green[700],
+                            foregroundColor: Colors.white,
+                          ),
                     child: _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
                         : logins

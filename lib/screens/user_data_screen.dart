@@ -149,6 +149,10 @@ class _UserDataScreenState extends State<UserDataScreen> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _namaController,
+                        autofocus: true,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (value) =>
+                            FocusScope.of(context).nextFocus(),
                         decoration: const InputDecoration(
                           labelText: "Nama",
                           border: OutlineInputBorder(),
@@ -160,6 +164,9 @@ class _UserDataScreenState extends State<UserDataScreen> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _alamatController,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (value) =>
+                            FocusScope.of(context).nextFocus(),
                         decoration: const InputDecoration(
                           labelText: "Alamat Sekolah",
                           border: OutlineInputBorder(),
@@ -171,6 +178,9 @@ class _UserDataScreenState extends State<UserDataScreen> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _startController,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (value) =>
+                            FocusScope.of(context).nextFocus(),
                         onTap: () => _pickDate(_startController),
                         decoration: const InputDecoration(
                           labelText: "Start 1",
@@ -184,6 +194,9 @@ class _UserDataScreenState extends State<UserDataScreen> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _endController,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (value) =>
+                            FocusScope.of(context).nextFocus(),
                         onTap: () => _pickDate(_endController),
                         decoration: const InputDecoration(
                           labelText: "End 1",
@@ -198,6 +211,9 @@ class _UserDataScreenState extends State<UserDataScreen> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _start2Controller,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (value) =>
+                            FocusScope.of(context).nextFocus(),
                         onTap: () => _pickDate(_start2Controller),
                         decoration: const InputDecoration(
                           labelText: "Start 2",
@@ -211,6 +227,8 @@ class _UserDataScreenState extends State<UserDataScreen> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _end2Controller,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (value) => _saveUserData(),
                         onTap: () => _pickDate(_end2Controller),
                         decoration: const InputDecoration(
                           labelText: "End 2",

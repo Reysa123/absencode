@@ -6,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class VerifyOtpScreen extends StatefulWidget {
   final String email;
 
-
   const VerifyOtpScreen({super.key, required this.email});
 
   @override
@@ -21,9 +20,9 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
     final token = _otpController.text.trim();
 
     if (token.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OTP harus 6 digit')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('OTP harus 6 digit')));
       return;
     }
 
@@ -33,21 +32,20 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
       final response = await supabase.auth.verifyOTP(
         email: widget.email,
         token: token,
-        type: OtpType.email,           // Penting: gunakan OtpType.email
+        type: OtpType.email, // Penting: gunakan OtpType.email
       );
-final pref = await SharedPreferences.getInstance();
-          await pref.setString('user', widget.email);
-          await pref.setString('pass', 'isuzu123');
+      final pref = await SharedPreferences.getInstance();
+      await pref.setString('user', widget.email);
+      await pref.setString('pass', 'isuzu123');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login berhasil!')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Login berhasil!')));
 
         // Navigasi ke halaman utama
-        Navigator.pushAndRemoveUntil(
+        Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const AttendanceHome()),
-          (route) => false,
+          MaterialPageRoute(builder: (_) => const AuthWrapper()),
         );
       }
     } catch (e) {
@@ -70,8 +68,10 @@ final pref = await SharedPreferences.getInstance();
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Masukkan kode 6 digit yang dikirim ke\n${widget.email}',
-                textAlign: TextAlign.center),
+            Text(
+              'Masukkan kode 6 digit yang dikirim ke\n${widget.email}',
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 20),
             TextField(
               controller: _otpController,
