@@ -89,7 +89,7 @@ class AuthWrapper extends StatelessWidget {
           } else {
             return BlocProvider(
               create: (_) => AttendanceBloc(),
-              child: const AttendanceHome(),
+              child: const DailyReportScreen(),
             );
           }
         },

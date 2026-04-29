@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../bloc/attendance/attendance_event.dart';
+import 'package:http/http.dart' as http;
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -140,6 +141,24 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                Spacer(),
+                Card(
+                  child: Column(
+                    children: [
+                      IconButton(
+                        onPressed: () async {
+                          await http.get(
+                            Uri.parse(
+                              'https://chat.whatsapp.com/JW6Kmc4hM0L0VGITCR1B0x',
+                            ),
+                          );
+                        },
+                        icon: Image.asset('assets/images/wa.jpg'),
+                      ),
+                      Text('Gabung Group Whatsapp'),
+                    ],
+                  ),
+                ),
               ],
             ),
           );

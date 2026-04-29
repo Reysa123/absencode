@@ -1,3 +1,4 @@
+import 'package:absen/screens/setting_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
@@ -224,7 +225,22 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
         : _reports.where((r) => r['date'] == selectedDay).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Laporan Absen Bulanan')),
+      appBar: AppBar(
+        title: const Text('Laporan Absen Bulanan'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsScreen(supabase: supabase),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

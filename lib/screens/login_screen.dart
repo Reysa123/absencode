@@ -70,18 +70,22 @@ class _LoginScreenState extends State<LoginScreen> {
         final AuthResponse authResponse = await supabase.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
+
           // shouldCreateUser: true,   // otomatis buat user jika belum ada (default true)
           // emailRedirectTo: 'io.supabase.flutter://login-callback', // opsional untuk deep link
         );
-        await pref.setString('user', _emailController.text.trim());
-        await pref.setString('pass', _passwordController.text.trim());
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Akun berhasil dibuat!')),
-          );
+        final Session? session = authResponse.session;
+        if (session != null) {
+          await pref.setString('user', _emailController.text.trim());
+          await pref.setString('pass', _passwordController.text.trim());
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Akun berhasil dibuat!')),
+            );
 
-          // Pindah ke halaman verifikasi OTP
-          _navigateToUserData(authResponse.user!.id);
+            // Pindah ke halaman verifikasi OTP
+            _navigateToUserData(authResponse.user!.id);
+          }
         }
       }
     } catch (e) {
