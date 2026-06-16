@@ -33,6 +33,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     on<SubmitBIB>(_onSubmitBIB);
     on<UploadSickNote>(_onUploadSickNote);
     on<UpdateTime>(_onUpdateTime);
+    on<UpdateReason>(_onUpdateReason);
     _startClock();
     add(LoadAttendance());
   }
@@ -58,6 +59,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     LoadAttendance event,
     Emitter<AttendanceState> emit,
   ) async {
+    emit(state.copyWith(isLoading: true));
     final prefs = await SharedPreferences.getInstance();
     bool isTodayHoliday = DateTime.now().weekday == DateTime.sunday;
     List<String> missingDates = [];
@@ -73,10 +75,17 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       }
 
       // Cek apakah ada data absen di SharedPreferences untuk tanggal tersebut
-      final savedClockIn = prefs.getString('clockIn_$checkDateStr');
-      final savedClockOut = prefs.getString('clockOut_$checkDateStr');
+      final savedClockIn =
+          (await supabase.from('attendance').select().eq('date', checkDateStr))
+              .first['clock_in'];
+      final savedClockOut =
+          (await supabase.from('attendance').select().eq('date', checkDateStr))
+              .first['clock_out'];
       // Cek juga apakah user sudah pernah mengisi alasan untuk tanggal tersebut
-      final hasReason = prefs.getString('reason_$checkDateStr') != null;
+      final hasReason =
+          (await supabase.from('attendance').select().eq('date', checkDateStr))
+              .first['note'] !=
+          null;
 
       // Jika tidak absen DAN belum isi alasan, masukkan ke daftar "Missing"
       if (savedClockIn == null && !hasReason ||
@@ -84,6 +93,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         missingDates.add(checkDateStr);
       }
     }
+    print(missingDates.length);
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     final clockIn = prefs.getString('clockIn_$today');
@@ -95,6 +105,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         clockOutTime: clockOut,
         isHoliday: isTodayHoliday,
         missingAttendanceDates: missingDates,
+        isLoading: false,
       ),
     );
   }
@@ -107,6 +118,41 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     }
     if (state.clockOutTime != null) {
       await prefs.setString('clockOut_$today', state.clockOutTime!);
+    }
+  }
+
+  Future _onUpdateReason(
+    UpdateReason event,
+    Emitter<AttendanceState> emit,
+  ) async {
+    final user = supabase.auth.currentUser;
+
+    try {
+      final q = await supabase
+          .from('attendance')
+          .update({'note': event.note})
+          .eq('date', event.date)
+          .eq('userid', user!.id.toString())
+          .select();
+      if (q.isEmpty) {
+        await supabase.from('attendance').insert({
+          'userid': user.id.toString(),
+          'date': event.date,
+          'clock_in': state.clockInTime ?? "null",
+          'clock_out': state.clockOutTime ?? "null",
+          'status': state.clockInTime ?? "",
+
+          'latitude': null,
+          'longitude': null,
+          'distance_meters': "",
+          'note': event.note,
+          'radin': true,
+          'radout': true,
+        });
+      }
+      ;
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Gagal menyimpan ke server: $e");
     }
   }
 

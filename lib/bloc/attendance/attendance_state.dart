@@ -23,7 +23,7 @@ class AttendanceState extends Equatable {
     this.position,
     this.distance,
     this.isMockDetected = false,
-    this.isLoading = false,
+    this.isLoading = true,
     this.isWithinRadius = false,
     this.clockInTime,
     this.clockOutTime,
@@ -61,7 +61,8 @@ class AttendanceState extends Equatable {
       sickFile: sickFile ?? this.sickFile,
       ijinReason: ijinReason ?? this.ijinReason,
       isHoliday: isHoliday ?? this.isHoliday,
-      missingAttendanceDates: missingAttendanceDates??this.missingAttendanceDates,
+      missingAttendanceDates:
+          missingAttendanceDates ?? this.missingAttendanceDates,
     );
   }
 
@@ -78,6 +79,7 @@ class AttendanceState extends Equatable {
     clockOutTime,
     sickFile,
     ijinReason,
-    isHoliday,missingAttendanceDates,
+    isHoliday,
+    missingAttendanceDates,
   ];
 }

@@ -18,10 +18,19 @@ class ChangeView extends AttendanceEvent {
   final String view;
   ChangeView(this.view);
 }
+
 class UpdateTime extends AttendanceEvent {
   final DateTime time;
-   UpdateTime(this.time);
+  UpdateTime(this.time);
 }
+
+class UpdateReason extends AttendanceEvent {
+  final String note;
+  final String date;
+  final int attendanceId;
+  UpdateReason(this.note, this.date, this.attendanceId);
+}
+
 class SignInWithEmail extends AttendanceEvent {
   final String email;
   final String password;
@@ -29,7 +38,9 @@ class SignInWithEmail extends AttendanceEvent {
 }
 
 class SignOut extends AttendanceEvent {}
+
 class ClockIn extends AttendanceEvent {}
+
 class ClockOut extends AttendanceEvent {}
 
 class PickSickFile extends AttendanceEvent {
@@ -40,10 +51,12 @@ class PickSickFile extends AttendanceEvent {
 class ClearSickFile extends AttendanceEvent {}
 
 class SubmitIjin extends AttendanceEvent {
-   final String reason;
+  final String reason;
   SubmitIjin(this.reason);
 }
 
 class SubmitBIB extends AttendanceEvent {}
+
+
 
 class UploadSickNote extends AttendanceEvent {}

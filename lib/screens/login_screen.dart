@@ -17,6 +17,10 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordController1 = TextEditingController();
+  FocusNode p1 = FocusNode();
+  FocusNode p2 = FocusNode();
+  bool resetpass = false;
   late final StreamSubscription authSub;
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
@@ -36,80 +40,92 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
       logins = true;
     });
-
-    try {
-      if (_isLogin) {
-        final response = await supabase.auth.signInWithPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-        // print(response);
-        final user = response.user;
-        if (user != null) {
-          await pref.setString('user', _emailController.text.trim());
-          await pref.setString('pass', _passwordController.text.trim());
-
-          Fluttertoast.showToast(
-            msg: "Login berhasil!",
-            toastLength: Toast.LENGTH_LONG,
-          );
-          if (mounted) _navigateToUserData(user.id);
-          setState(() {
-            _isLoading = false;
-            logins = false;
-          });
-        }
-      } else {
-        setState(() {
-          _isLoading = true;
-        });
-        final AuthResponse authResponse = await supabase.auth.signUp(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-
-          // shouldCreateUser: true,   // otomatis buat user jika belum ada (default true)
-          // emailRedirectTo: 'io.supabase.flutter://login-callback', // opsional untuk deep link
-        );
-        final Session? session = authResponse.session;
-        if (session != null) {
-          await pref.setString('user', _emailController.text.trim());
-          await pref.setString('pass', _passwordController.text.trim());
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Akun berhasil dibuat!')),
-            );
-
-            // Pindah ke halaman verifikasi OTP
-            _navigateToUserData(authResponse.user!.id);
-          }
-        }
-      }
-    } on AuthException catch (e) {
+    if (resetpass) {
+      final UserResponse res = await supabase.auth.updateUser(
+        UserAttributes(password: _passwordController.text),
+      );
+      print(res.user!.email);
       setState(() {
         _isLoading = false;
         logins = false;
+        resetpass = false;
       });
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Error"),
-          content: e.toString().contains('invalid_credentials')
-              ? Text(
-                  "Gagal ${_isLogin ? 'login' : 'daftar'}\nPastikan email dan password benar, dan periksa koneksi internet.\nAtau Daftar Akun Baru jika belum punya akun.",
-                )
-              : Text(
-                  "Gagal ${_isLogin ? 'login' : 'daftar'} user sudah terdaftar\nError: $e",
-                ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("OK"),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      _navigateToUserData(res.user!.id);
+    } else {
+      try {
+        if (_isLogin) {
+          final response = await supabase.auth.signInWithPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
+          // print(response);
+          final user = response.user;
+          if (user != null) {
+            await pref.setString('user', _emailController.text.trim());
+            await pref.setString('pass', _passwordController.text.trim());
+
+            Fluttertoast.showToast(
+              msg: "Login berhasil!",
+              toastLength: Toast.LENGTH_LONG,
+            );
+            if (mounted) _navigateToUserData(user.id);
+            setState(() {
+              _isLoading = false;
+              logins = false;
+            });
+          }
+        } else {
+          setState(() {
+            _isLoading = true;
+          });
+          final AuthResponse authResponse = await supabase.auth.signUp(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+
+            // shouldCreateUser: true,   // otomatis buat user jika belum ada (default true)
+            // emailRedirectTo: 'io.supabase.flutter://login-callback', // opsional untuk deep link
+          );
+          final Session? session = authResponse.session;
+          if (session != null) {
+            await pref.setString('user', _emailController.text.trim());
+            await pref.setString('pass', _passwordController.text.trim());
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Akun berhasil dibuat!')),
+              );
+
+              // Pindah ke halaman verifikasi OTP
+              _navigateToUserData(authResponse.user!.id);
+            }
+          }
+        }
+      } on AuthException catch (e) {
+        setState(() {
+          _isLoading = false;
+          logins = false;
+        });
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Error"),
+            content: e.toString().contains('invalid_credentials')
+                ? Text(
+                    "Gagal ${_isLogin ? 'login' : 'daftar'}\nPastikan email dan password benar, dan periksa koneksi internet.\nAtau Daftar Akun Baru jika belum punya akun.",
+                  )
+                : Text(
+                    "Gagal ${_isLogin ? 'login' : 'daftar'} user sudah terdaftar\nError: $e",
+                  ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -131,19 +147,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-
   Future<void> _resetPassword() async {
     if (!_isValidEmail(_emailController.text.trim())) {
       Fluttertoast.showToast(msg: "Masukkan email yang valid");
       return;
     }
+    setState(() {
+      resetpass = true;
 
-    try {
-      await supabase.auth.resetPasswordForEmail(_emailController.text.trim());
-      Fluttertoast.showToast(msg: "Email reset password dikirim!");
-    } catch (e) {
-      Fluttertoast.showToast(msg: "Gagal mengirim email reset: $e");
-    }
+      _passwordController.clear();
+      _passwordController1.clear();
+      p1.requestFocus();
+    });
   }
 
   bool logins = false;
@@ -300,13 +315,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _passwordController,
+                    focusNode: p1,
                     obscureText: true,
                     decoration: const InputDecoration(
                       labelText: "Password",
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.lock),
                     ),
-                    onFieldSubmitted: (value) => _authenticate(),
+                    onFieldSubmitted: (value) => p2.requestFocus(),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return "Password wajib diisi";
@@ -318,6 +334,32 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
+                  resetpass
+                      ? TextFormField(
+                          controller: _passwordController1,
+                          focusNode: p2,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: "Password",
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.lock),
+                          ),
+                          onFieldSubmitted: (value) => _authenticate(),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return "Password wajib diisi";
+                            }
+                            if (value.length < 6) {
+                              return "Password minimal 6 karakter";
+                            }
+                            if (value != _passwordController.text) {
+                              return "Password tidak sama dengan password diatas";
+                            }
+                            return null;
+                          },
+                        )
+                      : SizedBox(),
+                  resetpass ? const SizedBox(height: 16) : SizedBox(),
                   ElevatedButton(
                     onPressed: _isLoading ? null : _authenticate,
                     style: _isLogin
@@ -370,6 +412,9 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordController1.dispose();
+    p1.dispose();
+    p2.dispose();
 
     super.dispose();
   }

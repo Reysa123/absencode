@@ -66,6 +66,7 @@ class DashboardScreen extends StatelessWidget {
             current.missingAttendanceDates != null &&
             current.missingAttendanceDates!.isNotEmpty,
         listener: (context, state) {
+          print(state.missingAttendanceDates!.length);
           // Ambil tanggal pertama yang terlewat untuk dimintai alasan
           final missingDate = state.missingAttendanceDates!.first;
 
@@ -90,7 +91,10 @@ class DashboardScreen extends StatelessWidget {
               ),
             );
           }
-
+          if (state.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+          
           return Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -222,7 +226,7 @@ class DashboardScreen extends StatelessWidget {
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
               SizedBox(width: 8),
-              Text("⚠️ Absen Terlewat"),
+              Text(" Absen Terlewat"),
             ],
           ),
           content: Column(
@@ -254,6 +258,12 @@ class DashboardScreen extends StatelessWidget {
           ),
           actions: [
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.yellow,
+                foregroundColor: Colors.black,
+                elevation: 5,
+                shadowColor: Colors.red,
+              ),
               onPressed: () async {
                 final reason = reasonController.text.trim();
                 if (reason.isNotEmpty) {
@@ -264,6 +274,9 @@ class DashboardScreen extends StatelessWidget {
                   // 2. Tutup dialog
                   Navigator.pop(dialogContext);
 
+                  context.read<AttendanceBloc>().add(
+                    UpdateReason(reason, date, 0),
+                  );
                   // 3. Picu ulang event LoadAttendance untuk mengecek hari terlewat berikutnya (jika ada)
                   context.read<AttendanceBloc>().add(LoadAttendance());
                 } else {
