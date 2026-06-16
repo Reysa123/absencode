@@ -29,7 +29,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await supabase.auth.verifyOTP(
+      await supabase.auth.verifyOTP(
         email: widget.email,
         token: token,
         type: OtpType.email, // Penting: gunakan OtpType.email

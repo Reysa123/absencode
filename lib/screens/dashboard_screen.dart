@@ -6,7 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../bloc/attendance/attendance_event.dart';
-import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -60,10 +60,36 @@ class DashboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: BlocBuilder<AttendanceBloc, AttendanceState>(
+      body: BlocConsumer<AttendanceBloc, AttendanceState>(
+        // LISTENER: Tempat memicu dialog/pop-up alasan bolos
+        listenWhen: (previous, current) =>
+            current.missingAttendanceDates != null &&
+            current.missingAttendanceDates!.isNotEmpty,
+        listener: (context, state) {
+          // Ambil tanggal pertama yang terlewat untuk dimintai alasan
+          final missingDate = state.missingAttendanceDates!.first;
+
+          // Tampilkan dialog alasan
+          _showMissingAttendanceDialog(context, missingDate);
+        },
+
+        // BUILDER: Tempat merender UI utama Anda (tetap seperti kode Anda sebelumnya)
         builder: (context, state) {
           final bloc = context.read<AttendanceBloc>();
           final dateFormat = DateFormat('EEEE, dd MMMM yyyy');
+
+          if (state.isHoliday == true) {
+            // Gunakan '== true' lebih aman daripada '!' jika property nullable
+            return const Center(
+              child: Text(
+                "Hari ini hari libur. Anda tidak perlu melakukan absen.",
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            );
+          }
 
           return Padding(
             padding: const EdgeInsets.all(16.0),
@@ -141,22 +167,39 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                Spacer(),
-                Card(
-                  child: Column(
-                    children: [
-                      IconButton(
-                        onPressed: () async {
-                          await http.get(
-                            Uri.parse(
-                              'https://chat.whatsapp.com/JW6Kmc4hM0L0VGITCR1B0x',
-                            ),
-                          );
-                        },
-                        icon: Image.asset('assets/images/wa.jpg'),
+                const Spacer(),
+                InkWell(
+                  onTap: () async {
+                    await launchUrl(
+                      Uri.parse(
+                        'https://chat.whatsapp.com/JW6Kmc4hM0L0VGITCR1B0x',
                       ),
-                      Text('Gabung Group Whatsapp'),
-                    ],
+                    );
+                  },
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            height: 40,
+                            width: 40,
+                            child: IconButton(
+                              iconSize: 40,
+                              onPressed: () async {
+                                await launchUrl(
+                                  Uri.parse(
+                                    'https://chat.whatsapp.com/JW6Kmc4hM0L0VGITCR1B0x',
+                                  ),
+                                );
+                              },
+                              icon: Image.asset('assets/wa.jpg'),
+                            ),
+                          ),
+                          const Text('Gabung Group Whatsapp'),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -164,6 +207,77 @@ class DashboardScreen extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  void _showMissingAttendanceDialog(BuildContext context, String date) {
+    final TextEditingController reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Wajib diisi, tidak bisa asal tutup
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+              SizedBox(width: 8),
+              Text("⚠️ Absen Terlewat"),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Anda terdeteksi tidak melakukan absensi pada tanggal:",
+                style: TextStyle(color: Colors.grey[700]),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                date,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: "Masukkan Alasan Tidak Hadir",
+                  hintText: "Contoh: Sakit, Izin, atau Lupa Absen",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () async {
+                final reason = reasonController.text.trim();
+                if (reason.isNotEmpty) {
+                  // 1. Simpan alasan ke SharedPreferences (atau DB lokal Anda)
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('reason_$date', reason);
+
+                  // 2. Tutup dialog
+                  Navigator.pop(dialogContext);
+
+                  // 3. Picu ulang event LoadAttendance untuk mengecek hari terlewat berikutnya (jika ada)
+                  context.read<AttendanceBloc>().add(LoadAttendance());
+                } else {
+                  // Tampilkan pesan jika alasan kosong
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Alasan wajib diisi!")),
+                  );
+                }
+              },
+              child: const Text("Kirim Alasan"),
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -14,6 +14,8 @@ class AttendanceState extends Equatable {
   final String? clockOutTime;
   final XFile? sickFile;
   final String ijinReason;
+  final bool? isHoliday;
+  final List<String>? missingAttendanceDates;
 
   const AttendanceState({
     this.currentView = 'dashboard',
@@ -27,6 +29,8 @@ class AttendanceState extends Equatable {
     this.clockOutTime,
     this.sickFile,
     this.ijinReason = '',
+    this.isHoliday,
+    this.missingAttendanceDates,
   });
 
   AttendanceState copyWith({
@@ -41,6 +45,8 @@ class AttendanceState extends Equatable {
     String? clockOutTime,
     XFile? sickFile,
     String? ijinReason,
+    bool? isHoliday,
+    List<String>? missingAttendanceDates,
   }) {
     return AttendanceState(
       currentView: currentView ?? this.currentView,
@@ -54,6 +60,8 @@ class AttendanceState extends Equatable {
       clockOutTime: clockOutTime ?? this.clockOutTime,
       sickFile: sickFile ?? this.sickFile,
       ijinReason: ijinReason ?? this.ijinReason,
+      isHoliday: isHoliday ?? this.isHoliday,
+      missingAttendanceDates: missingAttendanceDates??this.missingAttendanceDates,
     );
   }
 
@@ -70,5 +78,6 @@ class AttendanceState extends Equatable {
     clockOutTime,
     sickFile,
     ijinReason,
+    isHoliday,missingAttendanceDates,
   ];
 }

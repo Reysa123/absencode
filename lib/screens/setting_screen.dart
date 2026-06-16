@@ -18,7 +18,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxeWpud2NsZXdwbWxwdm1qbnpxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyMTg3ODE4NywiZXhwIjoyMDM3NDU0MTg3fQ.nF7O8DV6FflLsYvU1UTjQiNqly2tQvpfehIE8cI_o2o',
     );
     final users = await supabase.auth.admin.listUsers();
-    print(users.toList().toString());
     return users;
   }
 
@@ -33,7 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         attributes: AdminUserAttributes(banDuration: '1200000h'),
       );
     } catch (e) {
-      print(e.toString());
+      debugPrint(e.toString());
     }
   }
 

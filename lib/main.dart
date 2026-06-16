@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:absen/screens/dailyreport.dart';
 import 'package:flutter/services.dart';
 import 'package:absen/bloc/attendance/attendance_state.dart';
 import 'package:absen/screens/bib_screen.dart';
@@ -89,7 +88,7 @@ class AuthWrapper extends StatelessWidget {
           } else {
             return BlocProvider(
               create: (_) => AttendanceBloc(),
-              child: const DailyReportScreen(),
+              child: const AttendanceHome(),
             );
           }
         },
@@ -108,7 +107,7 @@ class AttendanceHome extends StatelessWidget {
     return BlocBuilder<AttendanceBloc, AttendanceState>(
       builder: (context, state) {
         Widget currentScreen;
-
+       // print(state.currentView);
         switch (state.currentView) {
           case 'clock-in':
           case 'clock-out':

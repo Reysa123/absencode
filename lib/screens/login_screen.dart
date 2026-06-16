@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:absen/main.dart';
 import 'package:absen/screens/user_data_screen.dart';
-import 'package:absen/screens/verifikasiotpscreen.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -41,12 +39,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       if (_isLogin) {
-        print('login');
         final response = await supabase.auth.signInWithPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
-
+        // print(response);
         final user = response.user;
         if (user != null) {
           await pref.setString('user', _emailController.text.trim());
@@ -63,7 +60,6 @@ class _LoginScreenState extends State<LoginScreen> {
           });
         }
       } else {
-        print('daftar');
         setState(() {
           _isLoading = true;
         });
@@ -88,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
       }
-    } catch (e) {
+    } on AuthException catch (e) {
       setState(() {
         _isLoading = false;
         logins = false;
@@ -135,38 +131,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _signInWithGoogle() async {
-    // setState(() => _isLoading = true);
-
-    authSub = supabase.auth.onAuthStateChange.listen((data) {
-      final event = data.event;
-      final user = data.session?.user;
-      print("Auth event: $event, user: ${user?.email}");
-      if (event == AuthChangeEvent.signedIn && user != null) {
-        authSub.cancel();
-        if (mounted) _navigateToUserData(user.id);
-      }
-    });
-
-    try {
-      await supabase.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: kIsWeb
-            ? null
-            : 'https://yqyjnwclewpmlpvmjnzq.supabase.co/auth/v1/callback',
-
-        authScreenLaunchMode: kIsWeb
-            ? LaunchMode.platformDefault
-            : LaunchMode.externalApplication,
-      );
-      Fluttertoast.showToast(msg: "Redirecting to Google...");
-    } catch (e) {
-      Fluttertoast.showToast(msg: "Google sign-in failed: $e");
-      authSub.cancel();
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
 
   Future<void> _resetPassword() async {
     if (!_isValidEmail(_emailController.text.trim())) {
@@ -206,7 +170,6 @@ class _LoginScreenState extends State<LoginScreen> {
       final AuthChangeEvent event = data.event;
       final session = data.session;
 
-      print(session?.user.emailConfirmedAt);
       if (event == AuthChangeEvent.signedIn) {
         setState(() {
           _isLoading = false;

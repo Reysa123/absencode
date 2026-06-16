@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:absen/main.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
@@ -60,12 +59,44 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     Emitter<AttendanceState> emit,
   ) async {
     final prefs = await SharedPreferences.getInstance();
+    bool isTodayHoliday = DateTime.now().weekday == DateTime.sunday;
+    List<String> missingDates = [];
+    final formatter = DateFormat('yyyy-MM-dd');
+    // Lakukan loop untuk mengecek 7 hari ke belakang (tidak termasuk hari ini)
+    for (int i = 1; i <= 7; i++) {
+      final checkDate = DateTime.now().subtract(Duration(days: i));
+      final checkDateStr = formatter.format(checkDate);
 
+      // Skip pengecekan jika hari tersebut adalah weekend (Sabtu/Minggu)
+      if (checkDate.weekday == DateTime.sunday) {
+        continue;
+      }
+
+      // Cek apakah ada data absen di SharedPreferences untuk tanggal tersebut
+      final savedClockIn = prefs.getString('clockIn_$checkDateStr');
+      final savedClockOut = prefs.getString('clockOut_$checkDateStr');
+      // Cek juga apakah user sudah pernah mengisi alasan untuk tanggal tersebut
+      final hasReason = prefs.getString('reason_$checkDateStr') != null;
+
+      // Jika tidak absen DAN belum isi alasan, masukkan ke daftar "Missing"
+      if (savedClockIn == null && !hasReason ||
+          savedClockOut == null && !hasReason) {
+        missingDates.add(checkDateStr);
+      }
+    }
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
     final clockIn = prefs.getString('clockIn_$today');
     final clockOut = prefs.getString('clockOut_$today');
 
-    emit(state.copyWith(clockInTime: clockIn, clockOutTime: clockOut));
+    emit(
+      state.copyWith(
+        clockInTime: clockIn,
+        clockOutTime: clockOut,
+        isHoliday: isTodayHoliday,
+        missingAttendanceDates: missingDates,
+      ),
+    );
   }
 
   Future<void> _saveAttendance() async {
@@ -96,7 +127,6 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
 
       final now = DateTime.now();
       if (attendanceId != null) {
-        print(attendanceId);
         await supabase
             .from('attendance')
             .update({
@@ -131,7 +161,6 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       Fluttertoast.showToast(msg: "Data berhasil disimpan ke Supabase");
     } catch (e) {
       Fluttertoast.showToast(msg: "Gagal menyimpan ke server: $e");
-      print(e.toString());
     }
     return id.isNotEmpty ? id.first['id'] : 0;
   }
@@ -165,11 +194,9 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     emit(state.copyWith(isLoading: true, isWithinRadius: true));
 
     try {
-      print('awal');
       bool serviceEnabled;
       LocationPermission permission;
       serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      print('serviceEnabled: $serviceEnabled');
       if (!serviceEnabled) {
         // Location services are not enabled don't continue
         // accessing the position and request users of the
@@ -181,7 +208,6 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         return Future.error('Location services are disabled.');
       }
       permission = await Geolocator.checkPermission();
-      print('permission: $permission');
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
@@ -288,7 +314,6 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     final timeStr = DateFormat('HH:mm').format(state.currentTime);
     emit(state.copyWith(clockInTime: timeStr));
     await _saveAttendance();
-    print(state.position?.latitude);
     int a = await _insertAttendanceToSupabase(
       status: 'clock-in',
       lat: state.position?.latitude,
