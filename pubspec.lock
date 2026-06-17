@@ -464,6 +464,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.0"
+  holiday_id:
+    dependency: "direct main"
+    description:
+      name: holiday_id
+      sha256: c0621ff727039dc27fbcbf967ae1e62d7595b7d6b6a4bcd256f9ce6f33ba5758
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.4"
   hooks:
     dependency: transitive
     description:

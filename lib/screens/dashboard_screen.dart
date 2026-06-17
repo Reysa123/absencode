@@ -35,7 +35,6 @@ class DashboardScreen extends StatelessWidget {
                         onPressed: () async {
                           final prefs = await SharedPreferences.getInstance();
                           await prefs.clear();
-                          //await Supabase.instance.client.auth.signOut();
 
                           if (context.mounted) {
                             Navigator.of(context).pop();
@@ -61,26 +60,33 @@ class DashboardScreen extends StatelessWidget {
         ],
       ),
       body: BlocConsumer<AttendanceBloc, AttendanceState>(
-        // LISTENER: Tempat memicu dialog/pop-up alasan bolos
-        listenWhen: (previous, current) =>
-            current.missingAttendanceDates != null &&
-            current.missingAttendanceDates!.isNotEmpty,
+        // 1. PERBAIKAN LISTENWHEN: Deteksi jika list tanggal absen kosong berubah menjadi ada,
+        // atau jika isinya berbeda (untuk menangani antrean tanggal berikutnya)
+        listenWhen: (previous, current) {
+          if (current.missingAttendanceDates == null ||
+              current.missingAttendanceDates!.isEmpty) {
+            return false;
+          }
+          if (previous.missingAttendanceDates == null ||
+              previous.missingAttendanceDates!.isEmpty) {
+            return true;
+          }
+          // Jika tanggal pertama berbeda dari sebelumnya (artinya pindah ke antrean hari berikutnya)
+          return previous.missingAttendanceDates!.first !=
+              current.missingAttendanceDates!.first;
+        },
         listener: (context, state) {
-          print(state.missingAttendanceDates!.length);
           // Ambil tanggal pertama yang terlewat untuk dimintai alasan
           final missingDate = state.missingAttendanceDates!.first;
 
           // Tampilkan dialog alasan
           _showMissingAttendanceDialog(context, missingDate);
         },
-
-        // BUILDER: Tempat merender UI utama Anda (tetap seperti kode Anda sebelumnya)
         builder: (context, state) {
           final bloc = context.read<AttendanceBloc>();
           final dateFormat = DateFormat('EEEE, dd MMMM yyyy');
 
           if (state.isHoliday == true) {
-            // Gunakan '== true' lebih aman daripada '!' jika property nullable
             return const Center(
               child: Text(
                 "Hari ini hari libur. Anda tidak perlu melakukan absen.",
@@ -92,14 +98,13 @@ class DashboardScreen extends StatelessWidget {
             );
           }
           if (state.isLoading) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           }
-          
+
           return Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                // Jam Besar
                 Card(
                   elevation: 4,
                   child: Padding(
@@ -123,8 +128,6 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-
-                // Status Clock In & Out
                 Row(
                   children: [
                     Expanded(
@@ -143,8 +146,6 @@ class DashboardScreen extends StatelessWidget {
                   ],
                 ),
                 const Spacer(),
-
-                // Tombol Utama
                 if (state.clockInTime == null)
                   _actionButton(
                     "Clock In",
@@ -219,7 +220,7 @@ class DashboardScreen extends StatelessWidget {
 
     showDialog(
       context: context,
-      barrierDismissible: false, // Wajib diisi, tidak bisa asal tutup
+      barrierDismissible: false,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Row(
@@ -262,28 +263,35 @@ class DashboardScreen extends StatelessWidget {
                 backgroundColor: Colors.yellow,
                 foregroundColor: Colors.black,
                 elevation: 5,
-                shadowColor: Colors.red,
               ),
               onPressed: () async {
                 final reason = reasonController.text.trim();
                 if (reason.isNotEmpty) {
-                  // 1. Simpan alasan ke SharedPreferences (atau DB lokal Anda)
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setString('reason_$date', reason);
 
-                  // 2. Tutup dialog
-                  Navigator.pop(dialogContext);
+                  // 2. PERBAIKAN ALUR: Ambil context BLoC sebelum dialog ditutup (pop)
+                  // agar terhindar dari ketidakstabilan context pasca-pop.
+                  final attendanceBloc = BlocProvider.of<AttendanceBloc>(
+                    context,
+                  );
 
-                  context.read<AttendanceBloc>().add(
-                    UpdateReason(reason, date, 0),
-                  );
-                  // 3. Picu ulang event LoadAttendance untuk mengecek hari terlewat berikutnya (jika ada)
-                  context.read<AttendanceBloc>().add(LoadAttendance());
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                  }
+
+                  // Kirim alasan. Ingat, di dalam BLoC _onUpdateReason sudah ada pemicu `add(LoadAttendance())`.
+                  // Jadi di sini kita CUKUP memanggil UpdateReason saja agar tidak bentrok.
+                  attendanceBloc.add(UpdateReason(reason, date, 0));
                 } else {
-                  // Tampilkan pesan jika alasan kosong
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Alasan wajib diisi!")),
-                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Alasan wajib diisi!"),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
                 }
               },
               child: const Text("Kirim Alasan"),

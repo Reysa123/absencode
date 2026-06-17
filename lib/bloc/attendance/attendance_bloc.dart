@@ -10,6 +10,8 @@ import 'package:intl/intl.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'attendance_event.dart';
 import 'attendance_state.dart';
+import 'package:holiday_id/holiday_id.dart';
+import 'package:collection/collection.dart'; // Dibutuhkan untuk .firstOrNull
 
 class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   Timer? _clockTimer;
@@ -42,15 +44,13 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     DateTime lastEmittedTime = state.currentTime;
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       final now = DateTime.now();
-      // Only emit if the minute has changed (to avoid unnecessary rebuilds)
       if (now.minute != lastEmittedTime.minute) {
         lastEmittedTime = now;
-        add(UpdateTime(now)); // Dispatch event instead of emitting directly
+        add(UpdateTime(now));
       }
     });
   }
 
-  // Add this new event handler
   void _onUpdateTime(UpdateTime event, Emitter<AttendanceState> emit) {
     emit(state.copyWith(currentTime: event.time));
   }
@@ -60,54 +60,118 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     Emitter<AttendanceState> emit,
   ) async {
     emit(state.copyWith(isLoading: true));
-    final prefs = await SharedPreferences.getInstance();
-    bool isTodayHoliday = DateTime.now().weekday == DateTime.sunday;
-    List<String> missingDates = [];
-    final formatter = DateFormat('yyyy-MM-dd');
-    // Lakukan loop untuk mengecek 7 hari ke belakang (tidak termasuk hari ini)
-    for (int i = 1; i <= 7; i++) {
-      final checkDate = DateTime.now().subtract(Duration(days: i));
-      final checkDateStr = formatter.format(checkDate);
-
-      // Skip pengecekan jika hari tersebut adalah weekend (Sabtu/Minggu)
-      if (checkDate.weekday == DateTime.sunday) {
-        continue;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        emit(state.copyWith(isLoading: false));
+        return;
       }
 
-      // Cek apakah ada data absen di SharedPreferences untuk tanggal tersebut
-      final savedClockIn =
-          (await supabase.from('attendance').select().eq('date', checkDateStr))
-              .first['clock_in'];
-      final savedClockOut =
-          (await supabase.from('attendance').select().eq('date', checkDateStr))
-              .first['clock_out'];
-      // Cek juga apakah user sudah pernah mengisi alasan untuk tanggal tersebut
-      final hasReason =
-          (await supabase.from('attendance').select().eq('date', checkDateStr))
-              .first['note'] !=
-          null;
+      List<String> missingDates = [];
+      List<String> holidayNama = [];
+      final formatter = DateFormat('yyyy-MM-dd');
+      final now = DateTime.now();
 
-      // Jika tidak absen DAN belum isi alasan, masukkan ke daftar "Missing"
-      if (savedClockIn == null && !hasReason ||
-          savedClockOut == null && !hasReason) {
-        missingDates.add(checkDateStr);
+      var holidaysInyear = HolidayId().getHolidays(
+        filterType: HolidayType.holiday,
+        filterYear: now.year,
+      );
+
+      final todayHoliday = holidaysInyear.firstWhereOrNull(
+        (v) => formatter.format(v.date) == formatter.format(now),
+      );
+      bool isTodayHoliday =
+          now.weekday == DateTime.sunday ||
+          (todayHoliday?.type == HolidayType.holiday);
+
+      // 1. OPTIMASI: Ambil data user satu kali saja
+      final userData = await supabase
+          .from('user')
+          .select('start1')
+          .eq('userid', user.id)
+          .maybeSingle();
+      DateTime? tglStart;
+      if (userData != null && userData['start1'] != null) {
+        final startuser = userData['start1'].toString();
+        final parts = startuser.split(" ");
+        if (parts.length >= 3) {
+          tglStart = DateTime(
+            int.parse(parts[2]),
+            int.parse(parts[1]),
+            int.parse(parts[0]),
+          );
+        }
       }
+
+      // 2. OPTIMASI: Ambil data absen 7 hari ke belakang sekaligus (mengurangi request internet)
+      final sevenDaysAgoStr = formatter.format(
+        now.subtract(const Duration(days: 7)),
+      );
+      final yesterdayStr = formatter.format(
+        now.subtract(const Duration(days: 1)),
+      );
+
+      final attendanceRecords = await supabase
+          .from('attendance')
+          .select('date, clock_in, clock_out, note')
+          .eq('userid', user.id)
+          .gte('date', sevenDaysAgoStr)
+          .lte('date', yesterdayStr);
+
+      // Loop untuk mengecek 7 hari ke belakang
+      for (int i = 1; i <= 7; i++) {
+        final checkDate = now.subtract(Duration(days: i));
+        final checkDateStr = formatter.format(checkDate);
+
+        final d = holidaysInyear.firstWhereOrNull(
+          (v) => formatter.format(v.date) == checkDateStr,
+        );
+
+        if (checkDate.weekday == DateTime.sunday ||
+            (d != null && d.type == HolidayType.holiday)) {
+          holidayNama.add(d?.name.isEmpty ?? true ? "Minggu" : d!.name);
+          continue;
+        }
+        print(
+          'hari yg dicek :$checkDate dan tgl start : $tglStart  ${tglStart?.isAfter(checkDate)}',
+        );
+        if (tglStart != null && tglStart.isAfter(checkDate)) {
+          continue;
+        }
+
+        // Cari record dari data yang sudah di-fetch di awal
+        final record = attendanceRecords.firstWhereOrNull(
+          (r) => r['date'] == checkDateStr,
+        );
+
+        final savedClockIn = record?['clock_in'];
+        final savedClockOut = record?['clock_out'];
+        final hasReason = record?['note'] != null;
+
+        if ((savedClockIn == null && !hasReason) ||
+            (savedClockOut == null && !hasReason)) {
+          missingDates.add(checkDateStr);
+        }
+      }
+      missingDates.sort((a, b) => a.compareTo(b));
+      final todayStr = formatter.format(now);
+      final clockIn = prefs.getString('clockIn_$todayStr');
+      final clockOut = prefs.getString('clockOut_$todayStr');
+
+      emit(
+        state.copyWith(
+          clockInTime: clockIn,
+          clockOutTime: clockOut,
+          isHoliday: isTodayHoliday,
+          missingAttendanceDates: missingDates,
+          isLoading: false,
+        ),
+      );
+    } catch (e) {
+      emit(state.copyWith(isLoading: false));
+      Fluttertoast.showToast(msg: "Gagal memuat data absensi: $e");
     }
-    print(missingDates.length);
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-    final clockIn = prefs.getString('clockIn_$today');
-    final clockOut = prefs.getString('clockOut_$today');
-
-    emit(
-      state.copyWith(
-        clockInTime: clockIn,
-        clockOutTime: clockOut,
-        isHoliday: isTodayHoliday,
-        missingAttendanceDates: missingDates,
-        isLoading: false,
-      ),
-    );
   }
 
   Future<void> _saveAttendance() async {
@@ -121,27 +185,28 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     }
   }
 
-  Future _onUpdateReason(
+  Future<void> _onUpdateReason(
     UpdateReason event,
     Emitter<AttendanceState> emit,
   ) async {
     final user = supabase.auth.currentUser;
+    if (user == null) return;
 
     try {
       final q = await supabase
           .from('attendance')
           .update({'note': event.note})
           .eq('date', event.date)
-          .eq('userid', user!.id.toString())
+          .eq('userid', user.id)
           .select();
+
       if (q.isEmpty) {
         await supabase.from('attendance').insert({
-          'userid': user.id.toString(),
+          'userid': user.id,
           'date': event.date,
           'clock_in': state.clockInTime ?? "null",
           'clock_out': state.clockOutTime ?? "null",
           'status': state.clockInTime ?? "",
-
           'latitude': null,
           'longitude': null,
           'distance_meters': "",
@@ -150,7 +215,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
           'radout': true,
         });
       }
-      ;
+      add(LoadAttendance());
     } catch (e) {
       Fluttertoast.showToast(msg: "Gagal menyimpan ke server: $e");
     }
@@ -166,39 +231,39 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     bool? radin,
     bool? radout,
   }) async {
-    List<Map<String, dynamic>> id = [];
+    List<Map<String, dynamic>> result = [];
     try {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception("User belum login");
 
       final now = DateTime.now();
-      if (attendanceId != null) {
+      if (attendanceId != null && attendanceId != 0) {
         await supabase
             .from('attendance')
             .update({
               'clock_out': now.toIso8601String(),
               'status': 'hadir',
-              'latitude': lat.toString(),
-              'longitude': lng.toString(),
-              'distance_meters': distance.toString(),
+              'latitude': lat?.toString(),
+              'longitude': lng?.toString(),
+              'distance_meters': distance?.toString(),
               'radin': radin ?? true,
               'radout': radout ?? true,
             })
             .eq('id', attendanceId);
         return attendanceId;
       }
-      id = await supabase.from('attendance').insert({
-        'userid': user.id.toString(),
+
+      result = await supabase.from('attendance').insert({
+        'userid': user.id,
         'date': DateFormat('yyyy-MM-dd').format(now),
         'clock_in': status == 'clock-in' ? now.toIso8601String() : null,
         'clock_out': status == 'clock-out' ? now.toIso8601String() : null,
         'status': status == 'clock-in' || status == 'clock-out'
             ? 'hadir'
             : status,
-
-        'latitude': lat.toString(),
-        'longitude': lng.toString(),
-        'distance_meters': distance.toString(),
+        'latitude': lat?.toString(),
+        'longitude': lng?.toString(),
+        'distance_meters': distance?.toString(),
         'note': note,
         'radin': radin ?? true,
         'radout': radout ?? true,
@@ -208,7 +273,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     } catch (e) {
       Fluttertoast.showToast(msg: "Gagal menyimpan ke server: $e");
     }
-    return id.isNotEmpty ? id.first['id'] : 0;
+    return result.isNotEmpty ? (result.first['id'] as int) : 0;
   }
 
   double _calculateDistance(
@@ -217,7 +282,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     double lat2,
     double lon2,
   ) {
-    const R = 6371e3;
+    const R = 6371e3; // metres
     final phi1 = lat1 * math.pi / 180;
     final phi2 = lat2 * math.pi / 180;
     final deltaPhi = (lat2 - lat1) * math.pi / 180;
@@ -237,74 +302,45 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     UpdateLocation event,
     Emitter<AttendanceState> emit,
   ) async {
-    emit(state.copyWith(isLoading: true, isWithinRadius: true));
+    emit(state.copyWith(isLoading: true));
 
     try {
-      bool serviceEnabled;
-      LocationPermission permission;
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        // Location services are not enabled don't continue
-        // accessing the position and request users of the
-        // App to enable the location services.
-        Fluttertoast.showToast(
-          msg: "Location services are disabled",
-          timeInSecForIosWeb: 2,
-        );
-        return Future.error('Location services are disabled.');
+        Fluttertoast.showToast(msg: "Layanan lokasi dinonaktifkan");
+        emit(state.copyWith(isLoading: false));
+        return;
       }
-      permission = await Geolocator.checkPermission();
+
+      LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          // Permissions are denied, next time you could try
-          // requesting permissions again (this is also where
-          // Android's shouldShowRequestPermissionRationale
-          // returned true. According to Android guidelines
-          // your App should show an explanatory UI now.
-          Fluttertoast.showToast(
-            msg: "Location permissions are denied",
-            timeInSecForIosWeb: 2,
-          );
-          return Future.error('Location permissions are denied');
-        }
-        if (permission == LocationPermission.always ||
-            permission == LocationPermission.whileInUse) {
-          // Permission granted, continue with location updates
-          Fluttertoast.showToast(
-            msg: "Location permissions are successfully granted",
-            timeInSecForIosWeb: 2,
-          );
+          Fluttertoast.showToast(msg: "Izin lokasi ditolak");
+          emit(state.copyWith(isLoading: false));
+          return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        // Permissions are denied forever, handle appropriately.
-        Fluttertoast.showToast(
-          msg: "Location permissions are permanently denied",
-          timeInSecForIosWeb: 2,
-        );
-        return Future.error(
-          'Location permissions are permanently denied, we cannot request permissions.',
-        );
+        Fluttertoast.showToast(msg: "Izin lokasi ditolak permanen");
+        emit(state.copyWith(isLoading: false));
+        return;
       }
+
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: WebSettings(
+        locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          maximumAge: Duration(minutes: 5),
+          timeLimit: Duration(seconds: 10),
         ),
       );
-      // print(pos.isMocked);
-      // print(pos.longitude);
-      //final isMock = await TrustLocation.isMockLocation;
+
       final dist = _calculateDistance(
         pos.latitude,
         pos.longitude,
         officeLat,
         officeLng,
       );
-      // print('Distance to office: $dist meters');
-      // print('isMock: $isMock');
       final withinRadius = dist <= radiusMeters;
 
       emit(
@@ -318,7 +354,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       );
     } catch (e) {
       emit(state.copyWith(isLoading: false));
-      Fluttertoast.showToast(msg: "Gagal mendapatkan lokasi");
+      Fluttertoast.showToast(msg: "Gagal mendapatkan lokasi: $e");
     }
   }
 
@@ -349,30 +385,27 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
 
   Future<void> _onClockIn(ClockIn event, Emitter<AttendanceState> emit) async {
     if (state.isMockDetected || !state.isWithinRadius) {
-      await SharedPreferences.getInstance().then((pref) {
-        pref.setInt('keluar', 2);
-      });
+      final pref = await SharedPreferences.getInstance();
+      await pref.setInt('keluar', 2);
+      Fluttertoast.showToast(msg: "Anda di luar radius kantor!");
       return;
     }
-    await SharedPreferences.getInstance().then((pref) {
-      pref.setInt('keluar', 0);
-    });
+    final pref = await SharedPreferences.getInstance();
+    await pref.setInt('keluar', 0);
+
     final timeStr = DateFormat('HH:mm').format(state.currentTime);
     emit(state.copyWith(clockInTime: timeStr));
     await _saveAttendance();
+
     int a = await _insertAttendanceToSupabase(
       status: 'clock-in',
       lat: state.position?.latitude,
       lng: state.position?.longitude,
       distance: state.distance,
     );
-    await SharedPreferences.getInstance().then(
-      (prefs) => prefs.setInt('attendanceId', a),
-    );
-    Fluttertoast.showToast(
-      msg: "Clock In berhasil!",
-      toastLength: Toast.LENGTH_LONG,
-    );
+
+    await pref.setInt('attendanceId', a);
+    Fluttertoast.showToast(msg: "Clock In berhasil!");
     add(ChangeView('dashboard'));
   }
 
@@ -381,20 +414,19 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     Emitter<AttendanceState> emit,
   ) async {
     if (state.isMockDetected || !state.isWithinRadius) {
-      await SharedPreferences.getInstance().then((pref) {
-        pref.setInt('keluar', 1);
-      });
+      final pref = await SharedPreferences.getInstance();
+      await pref.setInt('keluar', 1);
+      Fluttertoast.showToast(msg: "Anda di luar radius kantor!");
       return;
     }
-    await SharedPreferences.getInstance().then((pref) {
-      pref.setInt('keluar', 0);
-    });
-    final attendanceId = await SharedPreferences.getInstance().then(
-      (prefs) => prefs.getInt('attendanceId') ?? 0,
-    );
+    final pref = await SharedPreferences.getInstance();
+    await pref.setInt('keluar', 0);
+
+    final attendanceId = pref.getInt('attendanceId') ?? 0;
     final timeStr = DateFormat('HH:mm').format(state.currentTime);
     emit(state.copyWith(clockOutTime: timeStr));
     await _saveAttendance();
+
     await _insertAttendanceToSupabase(
       attendanceId: attendanceId,
       status: 'clock-out',
@@ -402,10 +434,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       lng: state.position?.longitude,
       distance: state.distance,
     );
-    Fluttertoast.showToast(
-      msg: "Clock Out berhasil!",
-      toastLength: Toast.LENGTH_LONG,
-    );
+    Fluttertoast.showToast(msg: "Clock Out berhasil!");
     add(ChangeView('dashboard'));
   }
 
@@ -422,66 +451,67 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     Emitter<AttendanceState> emit,
   ) async {
     emit(state.copyWith(isLoading: true));
-    final user = supabase.auth.currentUser;
-    if (user == null) throw Exception("User belum login");
-    final keluar = await SharedPreferences.getInstance().then(
-      (pref) => pref.getInt('keluar') ?? 0,
-    );
-    final now = DateTime.now();
-    final success = await _uploadToServer("ijin", reason: event.reason);
-    // await _insertAttendanceToSupabase(status: 'ijin', note: event.reason);
-    if (keluar != 0) {
-      final attendanceId = await SharedPreferences.getInstance().then(
-        (prefs) => prefs.getInt('attendanceId') ?? 0,
-      );
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception("User belum login");
+
+      final pref = await SharedPreferences.getInstance();
+      final keluar = pref.getInt('keluar') ?? 0;
+      final now = DateTime.now();
+
+      //final success = await _uploadToServer("ijin", reason: event.reason);
+
+      if (keluar != 0) {
+        final attendanceId = pref.getInt('attendanceId') ?? 0;
+        final timeStr = DateFormat('HH:mm').format(state.currentTime);
+
+        keluar == 1
+            ? emit(state.copyWith(clockOutTime: timeStr))
+            : emit(state.copyWith(clockInTime: timeStr));
+
+        await _saveAttendance();
+        await _insertAttendanceToSupabase(
+          attendanceId: attendanceId,
+          status: keluar == 1 ? 'clock-out' : 'clock-in',
+          lat: state.position?.latitude,
+          lng: state.position?.longitude,
+          distance: state.distance,
+          note: event.reason,
+          radin: keluar == 2 ? false : true,
+          radout: keluar == 1 ? false : true,
+        );
+        await pref.setInt('keluar', 0);
+      }
+
+      final success = await supabase.from('attendance').insert({
+        'userid': user.id,
+        'date': DateFormat('yyyy-MM-dd').format(now),
+        'status': 'ijin',
+        'note': event.reason,
+        'clock_in': now.toIso8601String(),
+        'clock_out': now.toIso8601String(),
+        'latitude': state.position?.latitude.toString(),
+        'longitude': state.position?.longitude.toString(),
+        'distance_meters': state.distance.toString(),
+      });
+
       final timeStr = DateFormat('HH:mm').format(state.currentTime);
-      keluar == 1
-          ? emit(state.copyWith(clockOutTime: timeStr))
-          : emit(state.copyWith(clockInTime: timeStr));
+      emit(
+        state.copyWith(
+          clockInTime: timeStr,
+          clockOutTime: timeStr,
+          isLoading: false,
+        ),
+      );
       await _saveAttendance();
-      await _insertAttendanceToSupabase(
-        attendanceId: attendanceId,
-        status: keluar == 1 ? 'clock-out' : 'clock-in',
-        lat: state.position?.latitude,
-        lng: state.position?.longitude,
-        distance: state.distance,
-        note: event.reason,
-        radin: keluar == 2 ? false : true,
-        radout: keluar == 1 ? false : true,
-      );
-      await SharedPreferences.getInstance().then(
-        (pref) => pref.setInt('keluar', 0),
-      );
-    }
-    await supabase.from('attendance').insert({
-      'userid': user.id.toString(),
 
-      'date': now.toIso8601String(),
-      'status': 'ijin',
-      'note': event.reason,
-      'clock_in': now.toIso8601String(),
-      'clock_out': now.toIso8601String(),
-      'latitude': state.position?.latitude.toString(),
-      'longitude': state.position?.longitude.toString(),
-      'distance_meters': state.distance.toString(),
-    });
-
-    final timeStr = DateFormat('HH:mm').format(state.currentTime);
-    emit(
-      state.copyWith(
-        clockInTime: timeStr,
-        clockOutTime: timeStr,
-        isLoading: false,
-      ),
-    );
-    await _saveAttendance();
-
-    if (success) {
-      Fluttertoast.showToast(
-        msg: "Permohonan ijin berhasil dikirim!",
-        toastLength: Toast.LENGTH_LONG,
-      );
-      emit(state.copyWith(ijinReason: '', currentView: 'dashboard'));
+      if (success) {
+        Fluttertoast.showToast(msg: "Permohonan ijin berhasil dikirim!");
+        emit(state.copyWith(ijinReason: '', currentView: 'dashboard'));
+      }
+    } catch (e) {
+      emit(state.copyWith(isLoading: false));
+      Fluttertoast.showToast(msg: "Gagal submit izin: $e");
     }
   }
 
@@ -489,10 +519,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     SubmitBIB event,
     Emitter<AttendanceState> emit,
   ) async {
-    Fluttertoast.showToast(
-      msg: "Absensi BIB berhasil!",
-      toastLength: Toast.LENGTH_LONG,
-    );
+    Fluttertoast.showToast(msg: "Absensi BIB berhasil!");
     add(ChangeView('dashboard'));
   }
 
@@ -516,30 +543,11 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     await _saveAttendance();
 
     if (success) {
-      Fluttertoast.showToast(
-        msg: "Surat sakit berhasil dikirim!",
-        toastLength: Toast.LENGTH_LONG,
-      );
+      Fluttertoast.showToast(msg: "Surat sakit berhasil dikirim!");
       add(ClearSickFile());
       add(ChangeView('dashboard'));
     }
   }
-
-  // Future<void> _signIn(
-  //   SignInWithEmail event,
-  //   Emitter<AttendanceState> emit,
-  // ) async {
-  //   try {
-  //     await supabase.auth.signInWithPassword(
-  //       email: event.email,
-  //       password: event.password,
-  //     );
-  //     // Setelah login berhasil, load attendance hari ini
-  //     add(LoadAttendance());
-  //   } catch (e) {
-  //     Fluttertoast.showToast(msg: "Login gagal: $e");
-  //   }
-  // }
 
   Future<bool> _uploadToServer(
     String type, {
@@ -552,11 +560,12 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
 
       final now = DateTime.now();
       final dateStr = DateFormat('yyyy-MM-dd').format(now);
-      final fileName =
-          '${user.id}/${type}_${dateStr}_${DateTime.now().millisecondsSinceEpoch}.${file?.name.split('.').last}';
 
-      // Upload file ke Supabase Storage
+      String? noteValue = reason;
+
       if (file != null) {
+        final fileName =
+            '${user.id}/${type}_${dateStr}_${now.millisecondsSinceEpoch}.${file.name.split('.').last}';
         final fileBytes = await file.readAsBytes();
         await supabase.storage
             .from('absen')
@@ -568,13 +577,14 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
                 upsert: false,
               ),
             );
+        noteValue = fileName;
       }
-      // Simpan metadata ke database
+
       await supabase.from('attendance').insert({
-        'userid': user.id.toString(),
+        'userid': user.id,
         'date': dateStr,
         'status': type,
-        'note': file != null ? fileName : null,
+        'note': noteValue,
         'clock_in': now.toIso8601String(),
         'clock_out': now.toIso8601String(),
         'latitude': state.position?.latitude.toString(),
@@ -582,17 +592,9 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         'distance_meters': state.distance.toString(),
       });
 
-      Fluttertoast.showToast(
-        msg: "Upload ke Server berhasil!",
-        toastLength: Toast.LENGTH_LONG,
-      );
       return true;
     } catch (e) {
-      Fluttertoast.showToast(
-        msg: "Gagal upload: $e",
-        toastLength: Toast.LENGTH_LONG,
-      );
-      // print(e.toString());
+      Fluttertoast.showToast(msg: "Gagal upload: $e");
       return false;
     }
   }

@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final UserResponse res = await supabase.auth.updateUser(
         UserAttributes(password: _passwordController.text),
       );
-      print(res.user!.email);
+      //print(res.user!.email);
       setState(() {
         _isLoading = false;
         logins = false;
